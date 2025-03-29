@@ -1,0 +1,55 @@
+/* Map Styles */
+.world-map path {
+  fill: #e5e7eb;
+  stroke: #fff;
+  stroke-width: 0.5;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.world-map path:hover {
+  fill: #a7f3d0 !important;
+  stroke-width: 1.5;
+  transform: scale(1.02);
+  transform-origin: center;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.3));
+  z-index: 10;
+}
+
+/* Visa Type Colors */
+.visa-free {
+  fill: #0D9488 !important; /* Teal for visa-free access */
+}
+
+.e-visa {
+  fill: #5EEAD4 !important; /* Lighter teal for eVisa */
+}
+
+.visa-on-arrival {
+  fill: #2DD4BF !important; /* Medium teal for visa on arrival */
+}
+
+.visa-required {
+  fill: #134E4A !important; /* Dark teal for traditional visa */
+}
+
+.user-country {
+  fill: #4B5563 !important; /* Gray for user's own country */
+}
+
+/* Animation for hover */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.country-highlight {
+  animation: pulse 1.5s infinite ease-in-out;
+} 

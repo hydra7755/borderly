@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="400" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+  <g fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.5">
+    <!-- Africa -->
+    <path data-country-code="EG" d="M512,192 L530,192 L530,205 L512,205 Z" title="Egypt" />
+    <path data-country-code="NG" d="M490,240 L510,240 L510,255 L490,255 Z" title="Nigeria" />
+    <path data-country-code="ZA" d="M510,310 L530,310 L530,325 L510,325 Z" title="South Africa" />
+    
+    <!-- Europe -->
+    <path data-country-code="GB" d="M450,140 L460,140 L460,150 L450,150 Z" title="United Kingdom" />
+    <path data-country-code="FR" d="M470,150 L485,150 L485,165 L470,165 Z" title="France" />
+    <path data-country-code="DE" d="M490,140 L505,140 L505,155 L490,155 Z" title="Germany" />
+    <path data-country-code="ES" d="M450,165 L465,165 L465,180 L450,180 Z" title="Spain" />
+    <path data-country-code="IT" d="M485,165 L495,165 L495,185 L485,185 Z" title="Italy" />
+    
+    <!-- Asia -->
+    <path data-country-code="CN" d="M650,170 L685,170 L685,210 L650,210 Z" title="China" />
+    <path data-country-code="IN" d="M620,200 L640,200 L640,230 L620,230 Z" title="India" />
+    <path data-country-code="JP" d="M700,160 L710,160 L710,180 L700,180 Z" title="Japan" />
+    <path data-country-code="RU" d="M580,90 L650,90 L650,140 L580,140 Z" title="Russia" />
+    <path data-country-code="AE" d="M580,210 L590,210 L590,215 L580,215 Z" title="United Arab Emirates" />
+    <path data-country-code="TH" d="M650,220 L660,220 L660,230 L650,230 Z" title="Thailand" />
+    
+    <!-- North America -->
+    <path data-country-code="US" d="M200,150 L270,150 L270,200 L200,200 Z" title="United States" />
+    <path data-country-code="CA" d="M200,100 L270,100 L270,145 L200,145 Z" title="Canada" />
+    <path data-country-code="MX" d="M200,205 L230,205 L230,235 L200,235 Z" title="Mexico" />
+    
+    <!-- South America -->
+    <path data-country-code="BR" d="M300,250 L330,250 L330,290 L300,290 Z" title="Brazil" />
+    <path data-country-code="AR" d="M290,300 L310,300 L310,330 L290,330 Z" title="Argentina" />
+    
+    <!-- Oceania -->
+    <path data-country-code="AU" d="M700,280 L730,280 L730,310 L700,310 Z" title="Australia" />
+    <path data-country-code="NZ" d="M750,330 L760,330 L760,340 L750,340 Z" title="New Zealand" />
+  </g>
+</svg> 

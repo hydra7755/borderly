@@ -1,0 +1,82 @@
+import { VisaRequirementsData } from '../types/visaRequirements';
+
+// This is a mock dataset for visa requirements
+// In a real application, this would be fetched from an API
+export const visaRequirementsData: VisaRequirementsData = {
+  "US": {
+    "CA": { visaType: "visa-free", duration: "180 days" },
+    "MX": { visaType: "visa-free", duration: "180 days" },
+    "GB": { visaType: "visa-free", duration: "90 days" },
+    "FR": { visaType: "visa-free", duration: "90 days" },
+    "DE": { visaType: "visa-free", duration: "90 days" },
+    "IT": { visaType: "visa-free", duration: "90 days" },
+    "ES": { visaType: "visa-free", duration: "90 days" },
+    "JP": { visaType: "visa-free", duration: "90 days" },
+    "KR": { visaType: "visa-free", duration: "90 days" },
+    "AU": { visaType: "visa-free", duration: "90 days" },
+    "NZ": { visaType: "visa-free", duration: "90 days" },
+    "CN": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "IN": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "RU": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "BR": { visaType: "visa-free", duration: "90 days" },
+    "ZA": { visaType: "visa-free", duration: "90 days" },
+    "AE": { visaType: "visa-free", duration: "30 days" },
+    "TH": { visaType: "visa-free", duration: "30 days" },
+    "EG": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "TR": { visaType: "e-visa", duration: "90 days", notes: "eVisa available online" },
+  },
+  "GB": {
+    "US": { visaType: "visa-free", duration: "90 days" },
+    "CA": { visaType: "visa-free", duration: "180 days" },
+    "FR": { visaType: "visa-free", duration: "90 days" },
+    "DE": { visaType: "visa-free", duration: "90 days" },
+    "IT": { visaType: "visa-free", duration: "90 days" },
+    "ES": { visaType: "visa-free", duration: "90 days" },
+    "JP": { visaType: "visa-free", duration: "90 days" },
+    "AU": { visaType: "e-visa", duration: "90 days", notes: "eTA required" },
+    "NZ": { visaType: "visa-free", duration: "90 days" },
+    "IN": { visaType: "e-visa", duration: "30 days", notes: "e-Visa available online" },
+    "ZA": { visaType: "visa-free", duration: "90 days" },
+    "CN": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "RU": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "BR": { visaType: "visa-free", duration: "90 days" },
+    "AE": { visaType: "visa-free", duration: "30 days" },
+    "TH": { visaType: "visa-free", duration: "30 days" },
+    "EG": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "TR": { visaType: "e-visa", duration: "90 days", notes: "eVisa available online" },
+    "MX": { visaType: "visa-free", duration: "180 days" },
+  },
+  "IN": {
+    "US": { visaType: "visa-required", duration: "10 years", notes: "B1/B2 visa required" },
+    "CA": { visaType: "visa-required", duration: "10 years", notes: "Tourist visa required" },
+    "GB": { visaType: "visa-required", duration: "6 months", notes: "Tourist visa required" },
+    "FR": { visaType: "visa-required", duration: "90 days", notes: "Schengen visa required" },
+    "DE": { visaType: "visa-required", duration: "90 days", notes: "Schengen visa required" },
+    "IT": { visaType: "visa-required", duration: "90 days", notes: "Schengen visa required" },
+    "ES": { visaType: "visa-required", duration: "90 days", notes: "Schengen visa required" },
+    "JP": { visaType: "visa-required", duration: "90 days", notes: "Tourist visa required" },
+    "AU": { visaType: "visa-required", duration: "12 months", notes: "Tourist visa required" },
+    "NZ": { visaType: "visa-required", duration: "9 months", notes: "Tourist visa required" },
+    "CN": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "RU": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "BR": { visaType: "visa-required", duration: "90 days", notes: "Tourist visa required" },
+    "ZA": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "AE": { visaType: "visa-on-arrival", duration: "14 days", notes: "VOA for tourists" },
+    "TH": { visaType: "visa-free", duration: "30 days" },
+    "EG": { visaType: "visa-required", duration: "30 days", notes: "Tourist visa required" },
+    "TR": { visaType: "e-visa", duration: "30 days", notes: "eVisa available online" },
+    "MX": { visaType: "visa-required", duration: "180 days", notes: "Tourist visa required" },
+    "SG": { visaType: "visa-free", duration: "30 days" },
+    "MY": { visaType: "visa-free", duration: "30 days" },
+    "LK": { visaType: "visa-free", duration: "30 days" },
+    "NP": { visaType: "visa-free", duration: "Unlimited" },
+    "BT": { visaType: "visa-free", duration: "14 days" },
+    "MV": { visaType: "visa-on-arrival", duration: "30 days" },
+    "ID": { visaType: "visa-free", duration: "30 days" },
+  }
+};
+
+// Helper function to get visa requirements for a nationality
+export const getVisaRequirementsForCountry = (countryCode: string) => {
+  return visaRequirementsData[countryCode] || {};
+}; 
