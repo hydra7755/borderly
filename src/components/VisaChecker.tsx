@@ -134,11 +134,30 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
     const loadVisaRequirements = async () => {
       try {
         if (DEBUG) console.group('Loading Visa Requirements');
-        const response = await fetch('/visarequirements.json');
-        if (!response.ok) {
-          throw new Error(`Failed to load visa requirements: ${response.status} ${response.statusText}`);
+        
+        // Load all three visa requirement files
+        const response1 = await fetch('/visarequirements1.json');
+        if (!response1.ok) {
+          throw new Error(`Failed to load visa requirements (A-H): ${response1.status} ${response1.statusText}`);
         }
-        const data = await response.json();
+        
+        const response2 = await fetch('/visarequirements2.json');
+        if (!response2.ok) {
+          throw new Error(`Failed to load visa requirements (I-Q): ${response2.status} ${response2.statusText}`);
+        }
+        
+        const response3 = await fetch('/visarequirements3.json');
+        if (!response3.ok) {
+          throw new Error(`Failed to load visa requirements (R-Z): ${response3.status} ${response3.statusText}`);
+        }
+        
+        const data1 = await response1.json();
+        const data2 = await response2.json();
+        const data3 = await response3.json();
+        
+        // Combine all data
+        const data = [...data1, ...data2, ...data3];
+        
         if (DEBUG) console.log('Raw visa requirements data:', data);
         
         // Validate data structure

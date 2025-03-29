@@ -761,20 +761,33 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
       try {
         // Get user nationality, default to GB if not available
         const nationality = userData?.nationality || 'GB';
+        const nationalityName = getCountryName(nationality);
+        let visaData = [];
         
-        // Fetch visa requirements from JSON file
-        const response = await fetch('/visarequirements.json');
+        // Determine which file(s) to load based on nationality first letter
+        const firstLetter = nationalityName.charAt(0).toUpperCase();
+        
+        // Choose the appropriate file based on the first letter of the nationality
+        let response;
+        if (firstLetter >= 'A' && firstLetter <= 'H') {
+          response = await fetch('/visarequirements1.json');
+        } else if (firstLetter >= 'I' && firstLetter <= 'Q') {
+          response = await fetch('/visarequirements2.json');
+        } else {
+          response = await fetch('/visarequirements3.json');
+        }
+        
         if (!response.ok) {
           throw new Error('Failed to load visa requirements');
         }
         
-        const data = await response.json();
+        visaData = await response.json();
         
         // Map destinations with visa requirements
         const destinationsWithVisaStatus = allDestinations.map(destination => {
           // Find the visa requirement for user's nationality to this destination
-          const requirement = data.find((req: any) => 
-            req.passport === getCountryName(nationality) && 
+          const requirement = visaData.find((req: any) => 
+            req.passport === nationalityName && 
             req.destination === getCountryName(destination.code)
           );
           
