@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Dashboard/Sidebar';
 import Header from '../components/layout/Header';
@@ -121,6 +121,13 @@ const mockPassportStrengthData: Record<string, { strength: number }> = {
   // Default value will be 350 for countries not in this list
 };
 
+// Define the structure of visa requirements data
+interface VisaRequirementData {
+  Passport: string;
+  Destination: string;
+  Requirement: string;
+}
+
 const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequired, initialTab = 'overview' }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -163,12 +170,13 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
   const [isUploading, setIsUploading] = useState(false);
   const [documentCategory, setDocumentCategory] = useState('General');
   const [recommendationDestinations, setRecommendationDestinations] = useState<Array<{
-    name: string,
-    code: string,
-    description: string,
-    visa_status: string,
+    name: string;
+    code: string;
+    description: string;
+    visa_status?: string;
     tags: string[]
   }>>([]);
+  const [visaRequirements, setVisaRequirements] = useState<VisaRequirementData[]>([]);
 
   // Update the loadUserData function to use ExtendedUserProfile
   const loadUserData = async () => {
@@ -747,7 +755,39 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
 
   // Moved from renderRecommendedDestinations
   useEffect(() => {
-    const fetchVisaRequirements = async () => {
+    const fetchVisaRequirements = useCallback(async () => {
+      try {
+        // Load all three visa requirement files
+        const response1 = await fetch('/visarequirements1.json');
+        const response2 = await fetch('/visarequirements2.json');
+        const response3 = await fetch('/visarequirements3.json');
+        
+        if (!response1.ok || !response2.ok || !response3.ok) {
+          throw new Error('Failed to load visa requirements data');
+        }
+        
+        const data1 = await response1.json();
+        const data2 = await response2.json();
+        const data3 = await response3.json();
+        
+        // Combine all data
+        const data = [...data1, ...data2, ...data3];
+        
+        setVisaRequirements(data);
+      } catch (error) {
+        console.error('Error fetching visa requirements:', error);
+      }
+    }, []);
+    
+    // Only fetch if userData is available (specifically nationality)
+    if (userData) {
+        fetchVisaRequirements();
+    }
+  }, [userData?.nationality]); // Re-fetch when nationality changes
+
+  // Process recommended destinations when visa requirements are loaded
+  useEffect(() => {
+    if (visaRequirements.length > 0 && userData) {
       // Popular destinations with descriptions and tags
       const allDestinations = [
         { name: 'Japan', code: 'JP', description: 'Explore ancient temples and modern cities', tags: ['Culture', 'Food'] },
@@ -758,71 +798,39 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
         { name: 'South Africa', code: 'ZA', description: 'Wildlife safari and stunning landscapes', tags: ['Safari', 'Adventure'] },
       ];
 
-      try {
-        // Get user nationality, default to GB if not available
-        const nationality = userData?.nationality || 'GB';
-        const nationalityName = getCountryName(nationality);
-        let visaData = [];
+      // Get user nationality, default to GB if not available
+      const nationality = userData?.nationality || 'GB';
+      
+      // Map destinations with visa requirements
+      const destinationsWithVisaStatus = allDestinations.map(destination => {
+        // Find the visa requirement for user's nationality to this destination
+        const requirement = visaRequirements.find((req: VisaRequirementData) => 
+          req.Passport === getCountryName(nationality) && 
+          req.Destination === getCountryName(destination.code)
+        );
         
-        // Determine which file(s) to load based on nationality first letter
-        const firstLetter = nationalityName.charAt(0).toUpperCase();
+        let visa_status = 'visa-required';
         
-        // Choose the appropriate file based on the first letter of the nationality
-        let response;
-        if (firstLetter >= 'A' && firstLetter <= 'H') {
-          response = await fetch('/visarequirements1.json');
-        } else if (firstLetter >= 'I' && firstLetter <= 'Q') {
-          response = await fetch('/visarequirements2.json');
-        } else {
-          response = await fetch('/visarequirements3.json');
-        }
-        
-        if (!response.ok) {
-          throw new Error('Failed to load visa requirements');
-        }
-        
-        visaData = await response.json();
-        
-        // Map destinations with visa requirements
-        const destinationsWithVisaStatus = allDestinations.map(destination => {
-          // Find the visa requirement for user's nationality to this destination
-          const requirement = visaData.find((req: any) => 
-            req.passport === nationalityName && 
-            req.destination === getCountryName(destination.code)
-          );
-          
-          let visa_status = 'visa-required';
-          
-          if (requirement) {
-            const reqType = requirement.requirement.toLowerCase();
-            if (reqType === 'visa free' || reqType === 'free') {
-              visa_status = 'visa-free';
-            } else if (reqType === 'visa on arrival' || reqType === 'on arrival') {
-              visa_status = 'visa-on-arrival';
-            } else if (reqType === 'e-visa' || reqType === 'evisa' || reqType === 'eta' || reqType === 'esta') {
-              visa_status = 'e-visa';
-            }
+        if (requirement) {
+          const reqType = requirement.Requirement.toLowerCase();
+          if (reqType === 'visa free' || reqType === 'free') {
+            visa_status = 'visa-free';
+          } else if (reqType === 'visa on arrival' || reqType === 'on arrival') {
+            visa_status = 'visa-on-arrival';
+          } else if (reqType === 'e-visa' || reqType === 'evisa' || reqType === 'eta' || reqType === 'esta') {
+            visa_status = 'e-visa';
           }
-          
-          return {
-            ...destination,
-            visa_status
-          };
-        });
+        }
         
-        setRecommendationDestinations(destinationsWithVisaStatus);
-      } catch (error) {
-        console.error('Error loading visa requirements:', error);
-        // If there's an error, still show destinations with default visa status
-        setRecommendationDestinations(allDestinations.map(dest => ({ ...dest, visa_status: 'visa-required' })));
-      }
-    };
-    
-    // Only fetch if userData is available (specifically nationality)
-    if (userData) {
-        fetchVisaRequirements();
+        return {
+          ...destination,
+          visa_status
+        };
+      });
+      
+      setRecommendationDestinations(destinationsWithVisaStatus);
     }
-  }, [userData?.nationality]); // Re-fetch when nationality changes
+  }, [visaRequirements, userData]);
 
   // Styling for recommended destination cards
   const renderRecommendedDestinations = () => {
