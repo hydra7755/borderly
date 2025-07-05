@@ -1,76 +1,64 @@
-import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import EVisa from '../components/EVisa/EVisa';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { ALL_COUNTRIES } from '../utils/countries'; 
+import InteractiveVisaForm from '../components/EVisa/InteractiveVisaForm'; 
+// import LoadingSpinner from '../components/Common/LoadingSpinner'; 
+// import NotFoundPage from './NotFoundPage'; 
 
-interface EVisaApplicationProps {
-  isLoggedIn: boolean;
-  onLoginRequired: () => void;
+interface EVisaApplicationProps { 
+  isLoggedIn?: boolean;
+  onLoginRequired?: () => void;
 }
 
 const EVisaApplication: React.FC<EVisaApplicationProps> = ({ isLoggedIn, onLoginRequired }) => {
-  const location = useLocation();
+  const { nationalityCode = '', destinationCode = '' } = useParams<{ nationalityCode: string, destinationCode: string }>();
   const navigate = useNavigate();
-  const [nationalityCode, setNationalityCode] = useState<string>('');
-  const [destinationCode, setDestinationCode] = useState<string>('');
-  
+  const location = useLocation();
+  const [isValid, setIsValid] = useState<boolean | null>(null); 
+
   useEffect(() => {
-    // Parse URL parameters if they exist
-    const searchParams = new URLSearchParams(location.search);
-    const from = searchParams.get('from');
-    const to = searchParams.get('to');
-    
-    if (from && to) {
-      setNationalityCode(from);
-      setDestinationCode(to);
+    if (!nationalityCode || !destinationCode) {
+      setIsValid(false); 
+      return;
+    }
+    if (ALL_COUNTRIES && ALL_COUNTRIES.length > 0) {
+      // Make comparison case-insensitive by converting both sides to uppercase
+      const isNationalityValid = ALL_COUNTRIES.some((c: { code: string }) => c.code.toUpperCase() === nationalityCode.toUpperCase());
+      const isDestinationValid = ALL_COUNTRIES.some((c: { code: string }) => c.code.toUpperCase() === destinationCode.toUpperCase());
+      setIsValid(isNationalityValid && isDestinationValid);
     } else {
-      // If no parameters, we could either redirect or show a selection form
-      navigate('/visa-checker');
+      console.warn("Country data not available for validation.");
+      setIsValid(false); 
     }
-  }, [location.search, navigate]);
-  
-  // If user is not logged in, prompt for login
-  useEffect(() => {
-    if (!isLoggedIn) {
-      onLoginRequired();
-    }
-  }, [isLoggedIn, onLoginRequired]);
-  
-  if (!isLoggedIn) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50 p-4">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h2>
-          <p className="text-gray-600 mb-6">Please log in to continue with your eVisa application.</p>
-          <button 
-            onClick={onLoginRequired}
-            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
-          >
-            Log In
-          </button>
-        </div>
-      </div>
-    );
+  }, [nationalityCode, destinationCode]);
+
+  const handleCancel = () => {
+    console.log('Application cancelled');
+    navigate(-1); 
+  };
+
+  if (isValid === null) {
+    return <div className="p-10 text-center">Verifying application details...</div>; 
   }
-  
-  // If we don't have the required codes, don't render the eVisa component
-  if (!nationalityCode || !destinationCode) {
+
+  if (!isValid) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50 p-4">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Loading eVisa Application</h2>
-          <p className="text-gray-600">Please wait while we prepare your application...</p>
-        </div>
+      <div className="p-10 text-center text-red-600">
+        Invalid or missing country selection provided for the e-visa application.
+        <button onClick={() => navigate('/')} className="mt-4 px-4 py-2 bg-primary-600 text-white rounded">Go Home</button>
       </div>
-    );
+    ); 
   }
-  
+
   return (
-    <EVisa
-      nationalityCode={nationalityCode}
-      destinationCode={destinationCode}
-      onCancel={() => navigate('/visa-checker')}
-    />
+    <div className="bg-gray-50 dark:bg-gray-800 min-h-screen">
+      <InteractiveVisaForm
+        nationalityCode={nationalityCode.toUpperCase()}
+        destinationCode={destinationCode.toUpperCase()}
+        onCancel={handleCancel}
+      />
+    </div>
   );
 };
 
-export default EVisaApplication; 
+export default EVisaApplication;

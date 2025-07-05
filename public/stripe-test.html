@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stripe Test</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f7f7f7;
+    }
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #32325d;
+      margin-bottom: 30px;
+    }
+    #card-element {
+      border: 1px solid #e6e6e6;
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+    button {
+      background-color: #4f46e5;
+      color: white;
+      border: none;
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #4338ca;
+    }
+    #card-errors {
+      color: #dc2626;
+      font-size: 14px;
+      margin-top: 8px;
+    }
+    .success-message {
+      color: #16a34a;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Stripe Payment Test</h1>
+    <div id="payment-form">
+      <div id="card-element">
+        <!-- Stripe Elements will be inserted here -->
+      </div>
+      <div id="card-errors" role="alert"></div>
+      <button id="submit-button">Pay Now</button>
+    </div>
+    <div id="success-message" class="success-message" style="display: none;">
+      Payment successful!
+    </div>
+  </div>
+
+  <script>
+    // Public key from .env (for testing purposes only)
+    const stripePublicKey = 'pk_live_51REyp0KfTJliFsZGXkpSs7SBM7Va1X0BxqDy2ptfDFhe8tZBg6EJEzPncOx25x8nBRExGYM28WXBQNRUdFAVtTlm0047DymcPI';
+    
+    // Initialize Stripe
+    const stripe = Stripe(stripePublicKey);
+    const elements = stripe.elements();
+    
+    // Create card Element and mount it
+    const cardElement = elements.create('card');
+    cardElement.mount('#card-element');
+    
+    // Handle real-time validation errors
+    cardElement.on('change', (event) => {
+      const displayError = document.getElementById('card-errors');
+      if (event.error) {
+        displayError.textContent = event.error.message;
+      } else {
+        displayError.textContent = '';
+      }
+    });
+    
+    // Handle form submission
+    const form = document.getElementById('payment-form');
+    const submitButton = document.getElementById('submit-button');
+    
+    submitButton.addEventListener('click', async (event) => {
+      event.preventDefault();
+      
+      submitButton.disabled = true;
+      submitButton.textContent = 'Processing...';
+      
+      try {
+        // In a real app, you would create a payment intent on your server
+        // For this test, we'll just simulate a successful card validation
+        
+        // Validate the card details
+        const { error } = await stripe.createToken(cardElement);
+        
+        if (error) {
+          const errorElement = document.getElementById('card-errors');
+          errorElement.textContent = error.message;
+          submitButton.disabled = false;
+          submitButton.textContent = 'Pay Now';
+        } else {
+          // Show success message
+          document.getElementById('payment-form').style.display = 'none';
+          document.getElementById('success-message').style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        const errorElement = document.getElementById('card-errors');
+        errorElement.textContent = 'An unexpected error occurred. Please try again.';
+        submitButton.disabled = false;
+        submitButton.textContent = 'Pay Now';
+      }
+    });
+  </script>
+</body>
+</html> 

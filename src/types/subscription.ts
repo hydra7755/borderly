@@ -33,7 +33,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'monthly-tier',
     name: 'Monthly',
     tier: 'monthly',
-    price: 10,
+    price: 20,
     currency: 'GBP',
     benefits: [
       'Advanced travel score with more metrics',
@@ -51,7 +51,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'lifetime-tier',
     name: 'Lifetime',
     tier: 'lifetime',
-    price: 149,
+    price: 298,
     currency: 'GBP',
     benefits: [
       'All features from Monthly tier',

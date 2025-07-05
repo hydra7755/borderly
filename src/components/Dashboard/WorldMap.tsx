@@ -11,6 +11,13 @@ import { getVisaRequirementsForCountry } from '../../data/visaRequirements';
 import { VisaTypeColors, VisaRequirement } from '../../types/visaRequirements';
 import { getCountryName } from '../../data/countryCodes';
 
+// Define interface for country data including passport rank
+interface CountryData {
+  country: string;
+  passportRank: number;
+  // Add other relevant fields from countrydata.json if needed
+}
+
 interface WorldMapProps {
   userNationality: string;
   onCountrySelect?: (countryCode: string, visaDetails: VisaRequirement) => void;
@@ -22,14 +29,30 @@ const geoUrl = 'https://raw.githubusercontent.com/deldersveld/topojson/master/wo
 const WorldMap: React.FC<WorldMapProps> = ({ userNationality, onCountrySelect }) => {
   const [tooltipContent, setTooltipContent] = useState<{ 
     country: string; 
+    passportRank: number | null; // Add passportRank
     visaInfo: VisaRequirement | null; 
     position: { x: number; y: number } 
   } | null>(null);
   const [visaRequirements, setVisaRequirements] = useState<Record<string, VisaRequirement>>({});
+  const [countryData, setCountryData] = useState<Record<string, CountryData>>({}); // State for country data
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<boolean>(false);
 
   useEffect(() => {
+    // Fetch country data (including passport rank)
+    fetch('/countrydata.json')
+      .then(response => response.json())
+      .then((data: CountryData[]) => {
+        // Convert array to a map keyed by country name for easier lookup
+        const dataMap = data.reduce((acc, item) => {
+          // Assuming country names in countrydata.json match names in geo.properties.NAME
+          acc[item.country] = item;
+          return acc;
+        }, {} as Record<string, CountryData>);
+        setCountryData(dataMap);
+      })
+      .catch(error => console.error("Error fetching country data:", error));
+
     // Get visa requirements for the current user's nationality
     const requirements = getVisaRequirementsForCountry(userNationality);
     setVisaRequirements(requirements);
@@ -38,13 +61,16 @@ const WorldMap: React.FC<WorldMapProps> = ({ userNationality, onCountrySelect })
   // Handle mouse entering a country
   const handleMouseEnter = (geo: any, evt: React.MouseEvent) => {
     const countryCode = geo.properties.ISO_A2;
+    const countryName = geo.properties.NAME || getCountryName(countryCode);
     const visaInfo = visaRequirements[countryCode] || null;
+    const currentCountryData = countryData[countryName] || null; // Get data for this country
     
     // Don't show tooltip for user's own country
     if (countryCode === userNationality) return;
     
     setTooltipContent({
-      country: geo.properties.NAME || getCountryName(countryCode),
+      country: countryName,
+      passportRank: currentCountryData?.passportRank ?? null, // Add rank to tooltip state
       visaInfo,
       position: { x: evt.clientX, y: evt.clientY }
     });
@@ -137,8 +163,8 @@ const WorldMap: React.FC<WorldMapProps> = ({ userNationality, onCountrySelect })
             <Sphere stroke="#DDD" strokeWidth={0.5} />
             <Graticule stroke="#DDD" strokeWidth={0.5} />
             <Geographies geography={geoUrl}>
-              {({ geographies }) =>
-                geographies.map((geo) => (
+              {({ geographies }: { geographies: any[] }) =>
+                geographies.map((geo: any) => (
                   <Geography
                     key={geo.rsmKey}
                     geography={geo}
@@ -160,7 +186,7 @@ const WorldMap: React.FC<WorldMapProps> = ({ userNationality, onCountrySelect })
                         outline: 'none',
                       },
                     }}
-                    onMouseEnter={(evt) => handleMouseEnter(geo, evt)}
+                    onMouseEnter={(evt: React.MouseEvent) => handleMouseEnter(geo, evt)}
                     onMouseLeave={handleMouseLeave}
                     onClick={() => handleCountryClick(geo)}
                   />
@@ -200,7 +226,14 @@ const WorldMap: React.FC<WorldMapProps> = ({ userNationality, onCountrySelect })
               )}
             </div>
           ) : (
-            <p className="text-sm text-gray-500">No visa information available</p>
+            <p className="text-sm text-gray-500">Visa info not available.</p>
+          )}
+          {/* Display Passport Rank */}
+          {tooltipContent.passportRank !== null && (
+            <p className="text-sm mt-1">
+              <span className="font-medium">Passport Rank:</span>
+              <span className="ml-1">{tooltipContent.passportRank}</span>
+            </p>
           )}
         </div>
       )}

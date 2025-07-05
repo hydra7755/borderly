@@ -60,7 +60,7 @@ const Header: React.FC<HeaderProps> = ({
               className="flex items-center"
             >
               <span className="text-2xl font-bold text-primary-600">
-                Travel<span className="text-gray-800">Score</span>
+                Border<span className="text-gray-800">ly</span>
               </span>
             </button>
           </div>

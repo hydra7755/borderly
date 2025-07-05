@@ -1,5 +1,5 @@
-// This is a mapping of ISO 2-letter country codes to country names
-export const countryCodeToName: Record<string, string> = {
+// This map should be the single source of truth
+export const countryCodeMap: Record<string, string> = {
   "US": "United States",
   "GB": "United Kingdom",
   "CA": "Canada",
@@ -194,17 +194,28 @@ export const countryCodeToName: Record<string, string> = {
   "YE": "Yemen",
   "ZM": "Zambia",
   "ZW": "Zimbabwe",
-  // Add lowercase variants for better compatibility
-  "ag": "Antigua and Barbuda",
-  "ar": "Argentina",
-  "dz": "Algeria",
-  "us": "United States",
-  "gb": "United Kingdom"
+  // Add lowercase code mappings if needed, though typically codes are uppercase
+  // "gb": "United Kingdom", // Example
+  // "us": "United States", // Example
 };
 
-// Get country name from country code
-export const getCountryName = (countryCode: string): string => {
-  // Always convert to uppercase for consistency
-  const normalizedCode = countryCode.toUpperCase();
-  return countryCodeToName[normalizedCode] || countryCodeToName[countryCode] || countryCode;
-}; 
+// Get country name from country code using the single exported map
+export const getCountryName = (code: string | undefined | null): string => {
+  if (!code) {
+    console.log('[getCountryName] Received null/undefined country code');
+    return '';
+  }
+  return countryCodeMap[code.toUpperCase()] || code; // Fallback to code if name not found
+};
+
+// No need to export getCountryCode if we export the map
+// Function to get country code from name using the exported map
+// const getCountryCode = (name: string): string | undefined => {
+//     const normalizedName = name.trim().toLowerCase();
+//     for (const [code, countryName] of Object.entries(countryCodeMap)) {
+//       if ((countryName as string).toLowerCase() === normalizedName) {
+//         return code;
+//       }
+//     }
+//     return undefined; 
+// }; 

@@ -51,9 +51,9 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
       name: 'Premium',
       description: 'Comprehensive features for frequent travelers',
       price: {
-        monthly: 9.99,
-        annual: 99.99,
-        lifetime: 299
+        monthly: 9.98,
+        annual: 99.98,
+        lifetime: 198
       },
       features: [
         { name: 'Visa Requirement Checker', included: true },
@@ -64,7 +64,7 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
         { name: 'Travel History Management (Advanced)', included: true },
         { name: 'Travel Alerts', included: true },
         { name: 'Priority Support', included: true },
-        { name: 'AI Travel Assistant (5 queries/day)', included: true }
+        { name: 'AI Travel Assistant', included: true }
       ],
       popular: true,
       accentColor: 'text-primary-600 dark:text-primary-500',
@@ -76,9 +76,9 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
       name: 'Enterprise',
       description: 'Ultimate features for global business travelers',
       price: {
-        monthly: 19.99,
-        annual: 199.99,
-        lifetime: 499
+        monthly: 19.98,
+        annual: 199.98,
+        lifetime: 398
       },
       features: [
         { name: 'Visa Requirement Checker', included: true },
@@ -293,10 +293,9 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
             </div>
             
             <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">What payment methods do you accept?</h3>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">How do I pay for my subscription?</h3>
               <p className="text-gray-600 dark:text-gray-400">
-                We accept all major credit cards, PayPal, and bank transfers for subscription payments. For eVisa applications,
-                payment methods may vary depending on the destination country's requirements.
+                We use Stripe as our secure payment processor. You can pay using any major credit or debit card. All transactions are encrypted and secure.
               </p>
             </div>
           </div>

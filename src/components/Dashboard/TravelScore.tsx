@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
 
+// Add missing interface
+interface TravelScoreProps {
+  score: number;
+  countries: number;
+}
+
 const TravelScore = ({ score, countries }: TravelScoreProps) => {
   const [isRecalculating, setIsRecalculating] = useState(false);
   

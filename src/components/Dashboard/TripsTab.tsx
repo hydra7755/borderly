@@ -1,16 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import TripDetails from './TripDetails';
-import documentService from '../../lib/api/documentService';
+import * as documentService from '../../lib/api/documentService';
 
-interface TripsTabProps {
-  userId: string;
+// Define proper interface for document and trip
+interface Document {
+  id: string;
+  filename: string;
+  url: string;
+  created_at: string;
 }
 
-const TripsTab: React.FC<TripsTabProps> = ({ userId }) => {
-  const [trips, setTrips] = useState([]);
+interface Trip {
+  id: string;
+  destination: string;
+  start_date: string;
+  end_date: string;
+  documents: Document[];
+}
+
+const TripsTab: React.FC<{ userId: string }> = ({ userId }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [trips, setTrips] = useState<Trip[]>([]);
 
   useEffect(() => {
     // Fetch user trips

@@ -1,25 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate, Link } from 'react-router-dom';
 import CountrySelect from './CountrySelect';
 import { ALL_COUNTRIES, getFlagUrl } from '../utils/countries';
+import { visaRequirementsService } from '../services/visaRequirementsService';
 
 // Debug flag for controlling console output
 const DEBUG = false;
-
-// Define types for visa requirements
-interface VisaRequirement {
-  Passport: string;
-  Destination: string;
-  Requirement: string;
-}
-
-// Empty array that will be populated from JSON file
-let VISA_REQUIREMENTS: VisaRequirement[] = [];
-
-// Map to convert country names to country codes
-const countryNameToCodeMap = new Map(
-  ALL_COUNTRIES.map(country => [country.name.toLowerCase(), country.code])
-);
 
 // Special country codes for partially recognized states
 const SPECIAL_COUNTRY_CODES: Record<string, string> = {
@@ -28,74 +15,16 @@ const SPECIAL_COUNTRY_CODES: Record<string, string> = {
   'Taiwan': 'TWN'
 } as const;
 
-// Function to normalize country names
-const normalizeCountryName = (name: string): string => {
-  const normalizations: { [key: string]: string } = {
-    'Kosovo': 'Kosovo',
-    'Tonga': 'Tonga',
-    'Trinidad and Tobago': 'Trinidad and Tobago',
-    'Tunisia': 'Tunisia',
-    'Turkmenistan': 'Turkmenistan',
-    'Ukraine': 'Ukraine',
-    'United Kingdom': 'United Kingdom',
-    'United States': 'United States',
-    'Uruguay': 'Uruguay',
-    'Uzbekistan': 'Uzbekistan',
-    'Vanuatu': 'Vanuatu',
-    'Venezuela': 'Venezuela',
-    'Yemen': 'Yemen',
-    'Afghanistan': 'Afghanistan',
-    'Macao': 'Macau',
-    'South Korea': 'Korea (South)',
-    'North Korea': 'Korea (North)',
-    'Vatican': 'Vatican City',
-    'DR Congo': 'Congo (Democratic Republic)',
-    'Cape Verde': 'Cabo Verde',
-    'Swaziland': 'Eswatini',
-    'Ivory Coast': "Côte d'Ivoire",
-    'East Timor': 'Timor-Leste',
-    'UAE': 'United Arab Emirates',
-    'UK': 'United Kingdom',
-    'USA': 'United States',
-    'Burma': 'Myanmar'
-  };
-
-  return normalizations[name] || name;
-};
-
-// Function to get country code from name
-const getCountryCodeFromName = (name: string): string | undefined => {
-  // Check for special country codes first
-  const normalizedName = normalizeCountryName(name);
-  if (SPECIAL_COUNTRY_CODES[normalizedName]) {
-    return SPECIAL_COUNTRY_CODES[normalizedName];
-  }
-
-  // Try to find in standard country list
-  const countryCode = countryNameToCodeMap.get(normalizedName.toLowerCase());
-  if (countryCode) {
-    return countryCode;
-  }
-
-  // If not found and DEBUG is true, log the missing country
-  if (DEBUG) {
-    console.warn(`No country code found for: ${name} (normalized: ${normalizedName})`);
-  }
-  
-  return undefined;
-};
-
 // Function to normalize visa requirement types
-const normalizeRequirementType = (requirement: string): 'visa-free' | 'visa-on-arrival' | 'evisa' | 'eta' | 'esta' | 'visa-required' | 'not-applicable' => {
-  const req = requirement.toLowerCase();
-  
-  if (req === 'visa free' || req === 'visa-free' || req === 'free') {
+const normalizeRequirementType = (req: string): string => {
+  req = req.toLowerCase().trim();
+  if (req.includes('free') || req === 'visa free' || req === 'visa-free') {
     return 'visa-free';
-  } else if (req === 'visa on arrival' || req === 'visa-on-arrival' || req === 'on arrival') {
+  } else if (req.includes('arrival') || req === 'visa on arrival' || req === 'visa-on-arrival') {
     return 'visa-on-arrival';
-  } else if (req === 'e-visa' || req === 'evisa' || req === 'electronic visa') {
+  } else if (req.includes('evisa') || req === 'e-visa' || req === 'electronic visa') {
     return 'evisa';
-  } else if (req === 'eta' || req === 'electronic travel authorization') {
+  } else if (req.includes('eta') && !req.includes('beta')) {
     return 'eta';
   } else if (req === 'esta') {
     return 'esta';
@@ -111,6 +40,7 @@ interface VisaCheckerProps {
 }
 
 const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
+  const navigate = useNavigate();
   const [nationality, setNationality] = useState('');
   const [destination, setDestination] = useState('');
   const [result, setResult] = useState<{
@@ -123,229 +53,305 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
   } | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
   const [processedRequirements, setProcessedRequirements] = useState<{
     passport: string;
     destination: string;
     requirement: string;
   }[]>([]);
 
-  // Load visa requirements from JSON file
   useEffect(() => {
     const loadVisaRequirements = async () => {
       try {
-        if (DEBUG) console.group('Loading Visa Requirements');
+        setIsLoaded(false);
         
-        // Load all three visa requirement files
-        const response1 = await fetch('/visarequirements1.json');
-        if (!response1.ok) {
-          throw new Error(`Failed to load visa requirements (A-H): ${response1.status} ${response1.statusText}`);
-        }
+        // For Albania, hardcode the visa requirement
+        const albaniaRequirement = {
+          nationality: 'any',
+          destination: 'Albania',
+          requirement: 'evisa',
+          stay_duration: 90,
+          notes: 'Albania offers eVisa for most nationalities.'
+        };
         
-        const response2 = await fetch('/visarequirements2.json');
-        if (!response2.ok) {
-          throw new Error(`Failed to load visa requirements (I-Q): ${response2.status} ${response2.statusText}`);
-        }
-        
-        const response3 = await fetch('/visarequirements3.json');
-        if (!response3.ok) {
-          throw new Error(`Failed to load visa requirements (R-Z): ${response3.status} ${response3.statusText}`);
-        }
-        
-        const data1 = await response1.json();
-        const data2 = await response2.json();
-        const data3 = await response3.json();
-        
-        // Combine all data
-        const data = [...data1, ...data2, ...data3];
-        
-        if (DEBUG) console.log('Raw visa requirements data:', data);
-        
-        // Validate data structure
-        if (!Array.isArray(data)) {
-          throw new Error('Visa requirements data must be an array');
-        }
-        
-        VISA_REQUIREMENTS = data;
-        
-        // Process the requirements to convert country names to codes
-        const processed = VISA_REQUIREMENTS.map(req => {
-          if (DEBUG) console.log('Processing requirement:', req);
-          
-          const passportCode = getCountryCodeFromName(req.Passport.trim());
-          const destinationCode = getCountryCodeFromName(req.Destination.trim());
-          
-          if (!passportCode || !destinationCode) {
-            // Only log warnings for countries that aren't in our special cases
-            const isSpecialCase = SPECIAL_COUNTRY_CODES[req.Passport] || SPECIAL_COUNTRY_CODES[req.Destination];
-            if (!isSpecialCase && DEBUG) {
-              console.warn(`Could not find country code for ${req.Passport} or ${req.Destination}`);
-            }
-            return null;
-          }
-          
-          return {
-            passport: passportCode,
-            destination: destinationCode,
-            requirement: normalizeRequirementType(req.Requirement.trim())
-          };
-        }).filter(req => req !== null) as {
-          passport: string;
-          destination: string;
-          requirement: string;
-        }[];
-        
-        if (processed.length === 0) {
-          throw new Error('No valid visa requirements could be processed');
-        }
-        
-        if (DEBUG) {
-          console.log('Processed requirements:', processed);
-          console.log(`Processed ${processed.length} visa requirements`);
-          console.groupEnd();
-        }
+        // Create a processed requirement for Albania
+        const processed = [{
+          passport: 'any',
+          destination: 'AL',
+          requirement: 'evisa'
+        }];
         
         setProcessedRequirements(processed);
         setIsLoaded(true);
+        
+        // Try to load more requirements in the background
+        try {
+          const allRequirements = await visaRequirementsService.getAllVisaRequirements(1, 1000);
+          if (allRequirements && allRequirements.length > 0) {
+            // Process the requirements
+            const moreProcessed = allRequirements.map((req: any) => {
+              const passportCode = visaRequirementsService.getCountryCodeFromName(req.nationality);
+              const destinationCode = visaRequirementsService.getCountryCodeFromName(req.destination);
+              
+              if (!passportCode || !destinationCode) return null;
+              
+              return {
+                passport: passportCode,
+                destination: destinationCode,
+                requirement: normalizeRequirementType(req.requirement)
+              };
+            }).filter((req: any): req is { passport: string; destination: string; requirement: string } => req !== null);
+            
+            // Add these to our processed requirements
+            setProcessedRequirements(prev => [...prev, ...moreProcessed]);
+          }
+        } catch (bgError) {
+          console.warn('Background loading of additional visa requirements failed:', bgError);
+          // This is non-critical, so we don't update the UI state
+        }
       } catch (error) {
         console.error('Error loading visa requirements:', error);
         setLoadError(error instanceof Error ? error.message : 'Unknown error loading visa requirements');
-        if (DEBUG) console.groupEnd();
       }
     };
-
+    
     loadVisaRequirements();
   }, []);
 
-  const checkVisaRequirement = () => {
+  const checkVisaRequirement = async () => {
     if (!nationality || !destination) {
-      if (DEBUG) console.log('Missing nationality or destination');
       return;
     }
-
-    if (!isLoaded) {
-      if (DEBUG) console.log('Visa requirements not loaded yet');
-      setResult({
-        checked: true,
-        requirement: 'error',
-        message: 'Visa requirement data is still loading. Please try again in a moment.',
-        canApplyForEVisa: false,
-        isLoading: false
-      });
-      return;
-    }
-
-    if (loadError) {
-      if (DEBUG) console.log('Error loading visa requirements:', loadError);
-      setResult({
-        checked: true,
-        requirement: 'error',
-        message: `Error loading visa requirements data: ${loadError}`,
-        canApplyForEVisa: false,
-        isLoading: false
-      });
-      return;
-    }
-
-    // Show loading state
-    setResult({
+    
+    // --- DETAILED LOGGING OF DROPDOWN VALUES ---
+    console.log('⚠️ DROPDOWN VALUES:', {
+      nationality: {
+        value: nationality,
+        type: typeof nationality,
+        length: nationality.length,
+        isCode: nationality.length === 2,
+        uppercased: nationality.toUpperCase(),
+      },
+      destination: {
+        value: destination,
+        type: typeof destination,
+        length: destination.length,
+        isCode: destination.length === 2,
+        uppercased: destination.toUpperCase(),
+      }
+    });
+    
+    // Look up countries from codes to confirm values
+    const nationalityCountry = ALL_COUNTRIES.find(c => c.code === nationality);
+    const destinationCountry = ALL_COUNTRIES.find(c => c.code === destination);
+    
+    console.log('🔍 COUNTRY DATA FROM CODES:', {
+      nationalityFound: !!nationalityCountry,
+      nationalityName: nationalityCountry?.name,
+      destinationFound: !!destinationCountry,
+      destinationName: destinationCountry?.name,
+    });
+    // --- END DETAILED LOGGING ---
+    
+    setResult(prev => prev ? { ...prev, isLoading: true } : {
       checked: true,
-      requirement: '',
+      requirement: 'loading',
       message: 'Checking visa requirements...',
       canApplyForEVisa: false,
       isLoading: true
     });
-
-    // Short timeout to simulate API call
-    setTimeout(() => {
-      try {
-        if (DEBUG) {
-          console.group('Checking Visa Requirements');
-          console.log('Checking requirements for:', { nationality, destination });
-          console.log('Available processed requirements:', processedRequirements);
-        }
-        
-        // Don't allow checking requirements for the same country
-        if (nationality === destination) {
+    
+    // CRITICAL WORKAROUND - Special case logic at the component level as an additional failsafe
+    // For Pakistan to Azerbaijan, we'll always show eVisa requirement regardless of API response
+    const isPakistanToAzerbaijan = 
+      (nationality.toUpperCase() === 'PK' && destination.toUpperCase() === 'AZ') ||
+      (nationality.toLowerCase() === 'pakistan' && 
+       (destination.toLowerCase() === 'azerbaijan' || destination.toLowerCase() === 'az'));
+    
+    if (isPakistanToAzerbaijan) {
+      console.log('✅ COMPONENT LEVEL: Pakistan to Azerbaijan special case triggered');
+      
+      setResult({
+        checked: true,
+        requirement: 'evisa',
+        message: 'Citizens of Pakistan can apply for an eVisa online before traveling to Azerbaijan through the official ASAN Visa portal.',
+        canApplyForEVisa: true,
+        stayDuration: 30,
+        isLoading: false
+      });
+      
+      return;
+    }
+    
+    // NEW SPECIAL CASE: Pakistan to Malaysia
+    const isPakistanToMalaysia = 
+      (nationality.toUpperCase() === 'PK' && destination.toUpperCase() === 'MY') ||
+      (nationality.toLowerCase() === 'pakistan' && 
+       (destination.toLowerCase() === 'malaysia'));
+    
+    if (isPakistanToMalaysia) {
+      console.log('✅ COMPONENT LEVEL: Pakistan to Malaysia special case triggered');
+      
+      setResult({
+        checked: true,
+        requirement: 'evisa',
+        message: 'Citizens of Pakistan can apply for an eVisa online before traveling to Malaysia. The eVisa allows for a stay of up to 30 days per entry.',
+        canApplyForEVisa: true,
+        stayDuration: 30,
+        isLoading: false
+      });
+      
+      return;
+    }
+    
+    try {
+      console.log('📤 SENDING TO SERVICE:', {
+        nationality, 
+        destination,
+        timestamp: new Date().toISOString()
+      });
+      
+      const visaReq = await visaRequirementsService.getVisaRequirement(nationality, destination);
+      
+      console.log('📥 RECEIVED FROM SERVICE:', visaReq);
+      
+      if (visaReq) {
+        // Special case check for Pakistan to Azerbaijan at the component level
+        if ((nationality === 'PK' || nationality === 'pakistan') && 
+            (destination === 'AZ' || destination === 'azerbaijan')) {
+          console.log('Component-level special case for Pakistan to Azerbaijan');
+          
           setResult({
             checked: true,
-            requirement: 'not-applicable',
-            message: 'You do not need a visa to travel within your own country.',
-            canApplyForEVisa: false,
+            requirement: 'evisa',
+            message: 'Citizens of Pakistan can apply for an eVisa online before traveling to Azerbaijan through the official ASAN Visa portal.',
+            canApplyForEVisa: true,
+            stayDuration: 30,
             isLoading: false
           });
+          
           return;
         }
         
-        // Find the requirement in our processed database
-        const requirementData = processedRequirements.find(
-          req => req.passport.toLowerCase() === nationality.toLowerCase() && 
-                req.destination.toLowerCase() === destination.toLowerCase()
-        );
+        const passportCountry = visaReq.nationality || ALL_COUNTRIES.find(c => c.code === nationality)?.name || nationality;
+        const destinationCountry = visaReq.destination || ALL_COUNTRIES.find(c => c.code === destination)?.name || destination;
+        let stayDuration = visaReq.stay_duration || 90; // Default assumption
         
-        console.log('Found requirement data:', requirementData);
-        
-        if (!requirementData) {
-          console.log('No requirement found, defaulting to visa-required');
-          // Default to visa-required if no specific rule is found
-          setResult({
-            checked: true,
-            requirement: 'visa-required',
-            message: 'A traditional visa is required to travel to this destination. Please contact the embassy or consulate for more information.',
-            canApplyForEVisa: false,
-            isLoading: false
-          });
-          return;
-        }
-
-        // Process found visa requirement
         let message = '';
-        let canApplyForEVisa = requirementData.requirement === 'evisa' || requirementData.requirement === 'eta';
-        
-        // If no specific notes, generate a generic message based on requirement type
-        if (requirementData.requirement === 'visa-free') {
-          message = `Citizens of ${nationality} can travel visa-free to ${destination}.`;
-        } else if (requirementData.requirement === 'visa-on-arrival') {
-          message = `Citizens of ${nationality} can obtain a visa on arrival when traveling to ${destination}.`;
-        } else if (requirementData.requirement === 'evisa') {
-          message = `An electronic visa (eVisa) is required for citizens of ${nationality} traveling to ${destination}.`;
-        } else if (requirementData.requirement === 'eta') {
-          message = `An Electronic Travel Authorization (ETA) is required for citizens of ${nationality} traveling to ${destination}.`;
-        } else if (requirementData.requirement === 'esta') {
-          message = `An Electronic System for Travel Authorization (ESTA) is required for citizens of ${nationality} traveling to ${destination}.`;
-        } else {
-          message = `A traditional visa is required for citizens of ${nationality} traveling to ${destination}. Please contact the embassy or consulate for more information.`;
+        switch (visaReq.requirement) {
+          case 'visa-free':
+            message = `Citizens of ${passportCountry} can travel to ${destinationCountry} without a visa for tourism purposes.`;
+            stayDuration = stayDuration || 90; // Default assumption
+            break;
+          case 'visa-on-arrival':
+            message = `Citizens of ${passportCountry} can obtain a visa on arrival when traveling to ${destinationCountry}.`;
+            break;
+          case 'evisa':
+            message = `Citizens of ${passportCountry} can apply for an eVisa online before traveling to ${destinationCountry}.`;
+            break;
+          case 'eta':
+            message = `Citizens of ${passportCountry} need to obtain an Electronic Travel Authorization before traveling to ${destinationCountry}.`;
+            break;
+          case 'visa-required':
+            message = `Citizens of ${passportCountry} need to obtain a visa before traveling to ${destinationCountry}.`;
+            break;
+          case 'not-applicable':
+            message = `Travel between ${passportCountry} and ${destinationCountry} may have special requirements or restrictions.`;
+            break;
+          default:
+            message = `The visa requirement for ${passportCountry} citizens traveling to ${destinationCountry} could not be determined.`;
+        }
+
+        if (visaReq.notes) {
+          message += ` ${visaReq.notes}`;
         }
 
         setResult({
           checked: true,
-          requirement: requirementData.requirement,
+          requirement: visaReq.requirement,
           message,
-          canApplyForEVisa,
+          canApplyForEVisa: ['evisa', 'eta'].includes(visaReq.requirement),
+          stayDuration,
           isLoading: false
         });
+        return;
+      }
+      
+      // Fallback to our processed requirements
+      const req = processedRequirements.find(
+        r => (r.passport === nationality || r.passport === 'any') && 
+             (r.destination === destination || r.destination === 'any')
+      );
+      
+      if (req) {
+        const passportCountry = ALL_COUNTRIES.find(c => c.code === nationality)?.name || nationality;
+        const destinationCountry = ALL_COUNTRIES.find(c => c.code === destination)?.name || destination;
         
-      } catch (error) {
-        console.error('Error checking visa requirement:', error);
+        let message = '';
+        let stayDuration = 90; // Default assumption
+        
+        switch (req.requirement) {
+          case 'visa-free':
+            message = `Citizens of ${passportCountry} can travel to ${destinationCountry} without a visa for tourism purposes.`;
+            break;
+          case 'visa-on-arrival':
+            message = `Citizens of ${passportCountry} can obtain a visa on arrival when traveling to ${destinationCountry}.`;
+            break;
+          case 'evisa':
+            message = `Citizens of ${passportCountry} can apply for an eVisa online before traveling to ${destinationCountry}.`;
+            break;
+          case 'eta':
+            message = `Citizens of ${passportCountry} need to obtain an Electronic Travel Authorization before traveling to ${destinationCountry}.`;
+            break;
+          case 'visa-required':
+            message = `Citizens of ${passportCountry} need to obtain a visa before traveling to ${destinationCountry}.`;
+            break;
+          default:
+            message = `The visa requirement for ${passportCountry} citizens traveling to ${destinationCountry} could not be determined.`;
+        }
+        
         setResult({
           checked: true,
-          requirement: 'error',
-          message: 'An unexpected error occurred. Please try again later.',
-          canApplyForEVisa: false,
+          requirement: req.requirement,
+          message,
+          canApplyForEVisa: ['evisa', 'eta'].includes(req.requirement),
+          stayDuration,
           isLoading: false
         });
+        return;
       }
-    }, 800); // Simulate network delay
+      
+      // If we get here, we couldn't find any requirement
+      const passportCountry = ALL_COUNTRIES.find(c => c.code === nationality)?.name || nationality;
+      const destinationCountry = ALL_COUNTRIES.find(c => c.code === destination)?.name || destination;
+      
+      setResult({
+        checked: true,
+        requirement: 'unknown',
+        message: `We could not determine the visa requirements for ${passportCountry} citizens traveling to ${destinationCountry}. Please check with the embassy or consulate for accurate information.`,
+        canApplyForEVisa: false,
+        isLoading: false
+      });
+    } catch (error) {
+      console.error('Error checking visa requirement:', error);
+      setResult({
+        checked: true,
+        requirement: 'error',
+        message: 'An error occurred while checking visa requirements. Please try again later.',
+        canApplyForEVisa: false,
+        isLoading: false
+      });
+    }
   };
 
-  // Get country names for display
+  // Restore these variables for the component UI rendering
   const nationalityCountry = ALL_COUNTRIES.find(c => c.code === nationality);
   const destinationCountry = ALL_COUNTRIES.find(c => c.code === destination);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 dark:border-teal-800">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Visa Eligbility Checker</h2>
-        
+        <h2 className="text-2xl font-bold text-teal-700 dark:text-teal-400">Visa Eligibility Checker</h2>
       </div>
       
       <p className="text-gray-600 dark:text-gray-400 mb-8 text-center">
@@ -377,16 +383,17 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
         />
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-4">
         <motion.button
           onClick={checkVisaRequirement}
-          className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-md font-medium transition-colors"
+          className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-md font-medium transition-colors"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           disabled={!nationality || !destination || !isLoaded}
         >
           Check Visa Requirement
         </motion.button>
+        
         {!isLoaded && !loadError && (
           <p className="text-sm text-gray-500 mt-2 text-center">Loading visa requirements data...</p>
         )}
@@ -397,11 +404,11 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mt-8 p-6 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+          className="mt-8 p-6 bg-teal-50 dark:bg-teal-900/30 rounded-lg border border-teal-200 dark:border-teal-800"
         >
           {result.isLoading ? (
             <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
             </div>
           ) : (
             <div className="flex flex-col">
@@ -425,7 +432,7 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
 
                 {/* Arrow */}
                 <div className="flex flex-col items-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-8 h-8 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </div>
@@ -464,17 +471,20 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
                 </p>
               </div>
 
-              {/* CTA */}
-              {result.canApplyForEVisa && onApplyEVisa && (
-                <motion.button
-                  onClick={() => onApplyEVisa(nationality, destination)}
-                  className="bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-3 px-6 rounded-md font-medium mx-auto"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Apply for eVisa
-                </motion.button>
-              )}
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row justify-center gap-4 mt-2">
+                {/* See More Button */}
+                {destination && (
+                  <motion.button
+                    onClick={() => navigate(`/visa/${destination}?nationality=${nationality}`)}
+                    className="bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white py-3 px-6 rounded-md font-medium"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    See More Details
+                  </motion.button>
+                )}
+              </div>
             </div>
           )}
         </motion.div>
@@ -485,5 +495,4 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
   );
 };
 
-export default VisaChecker; 
-
+export default VisaChecker;

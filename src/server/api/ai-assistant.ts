@@ -1,9 +1,10 @@
 import express from 'express';
 import { handleAIAssistantRequest } from '../../api/ai-assistant';
+import { Request, Response } from 'express';
 
 const router = express.Router();
 
-router.post('/ai-assistant', async (req, res) => {
+router.post('/ai-assistant', async (req: Request, res: Response) => {
   try {
     const { message } = req.body;
     const response = await handleAIAssistantRequest(message);

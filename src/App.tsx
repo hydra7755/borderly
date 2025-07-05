@@ -8,8 +8,9 @@ import SignUp from './pages/SignUp';
 import Dashboard from './pages/Dashboard';
 import TravelScoreQuestionnaire from './pages/TravelScoreQuestionnaire';
 import NotFound from './pages/NotFound';
-import EVisa from './components/EVisa/EVisa';
+import EVisa from './pages/EVisa';
 import EVisaApplication from './pages/EVisaApplication';
+import EVisaRedirect from './pages/EVisaRedirect';
 import './App.css';
 import Contact from './pages/Contact';
 import Features from './pages/Features';
@@ -18,13 +19,20 @@ import Checkout from './pages/Checkout';
 import SubscriptionSuccess from './pages/SubscriptionSuccess';
 import ChatBubble from './components/AIAssistant/ChatBubble';
 import WorldMap from './pages/WorldMap';
+import VisaProduct from './pages/VisaProduct';
+import VisaProductBrowser from './pages/VisaProductBrowser';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import VisaChecker from './pages/VisaChecker';
 import AIAssistant from './pages/AIAssistant';
 import authService from './lib/api/auth';
 import { User } from '@supabase/supabase-js';
 import Blogs from './pages/Blogs';
+import BlogListing from './pages/BlogListing';
+import BlogDetail from './pages/BlogDetail';
 import AdminDashboard from './pages/Admin';
+import VisaApplicationPage from './pages/VisaApplicationPage';
+import PaymentPage from './pages/PaymentPage';
+import VisaConfirmationPage from './pages/VisaConfirmationPage';
 
 // Define types for pages
 type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'questionnaire' | 'world-map' | 'profile' | 'subscription' | 'evisa' | 
@@ -231,7 +239,9 @@ const AppContent: React.FC = () => {
   const handleSignUp = async (email: string, password: string, name: string) => {
     try {
       const { user, session, error } = await authService.signUp(email, password, {
-        full_name: name
+        full_name: name,
+        nationality: 'UNKNOWN',
+        residency: 'UNKNOWN'
       });
       
       if (error) {
@@ -283,7 +293,7 @@ const AppContent: React.FC = () => {
     
     if (isLoggedIn) {
       // User is already logged in, go directly to eVisa page
-      navigate('/evisa');
+      navigate(`/evisa/${nationalityCode}/${destinationCode}`);
     } else {
       // User needs to log in first, redirect to login page
       navigate('/login');
@@ -389,23 +399,46 @@ const AppContent: React.FC = () => {
                 <Landing 
                   onGetStarted={() => navigate('/questionnaire')}
                   onExploreFeatures={() => navigate('/features')}
-                  onApplyEVisa={(nationalityCode, destinationCode) => {
-                    setEVisaData({ nationalityCode, destinationCode });
-                    if (isLoggedIn) {
-                      navigate(`/evisa?from=${nationalityCode}&to=${destinationCode}`);
-                    } else {
-                      // Store the data and redirect after login
-                      setEVisaApplication(true);
-                      navigate('/login');
-                    }
-                  }}
+                  onApplyEVisa={startEVisaApplication}
                   onPricingSubscribe={handleSubscribe}
                   isLoggedIn={isLoggedIn}
                   onLoginRequired={() => navigate('/login')}
                 />
               } />
-              <Route path="/login" element={<Login onLogin={handleLogin} onNavigateToSignUp={() => navigate('/signup')} />} />
-              <Route path="/signup" element={<SignUp onSignUp={handleSignUp} onNavigateToLogin={() => navigate('/login')} />} />
+              <Route path="/login" element={
+                <Login 
+                  onLogin={handleLogin} 
+                  onNavigateToSignUp={() => navigate('/signup')} 
+                />
+              } />
+              <Route path="/signup" element={
+                <SignUp 
+                  onSignUp={handleSignUp} 
+                  onNavigateToLogin={() => navigate('/login')} 
+                />
+              } />
+              <Route path="/visa-checker" element={
+                <VisaChecker 
+                  isLoggedIn={isLoggedIn}
+                  onLoginRequired={() => navigate('/login')}
+                  onApplyEVisa={startEVisaApplication}
+                />
+              } />
+              <Route path="/features" element={<Features />} />
+              <Route path="/pricing" element={
+                <Pricing
+                  isLoggedIn={isLoggedIn}
+                  onGetStarted={() => navigate('/login')}
+                  onSubscribe={handleSubscribe}
+                />
+              } />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/evisa" element={<Navigate to="/visa-checker" replace />} />
+              <Route path="/evisa/:nationality/:destination" element={
+                <RequireAuth>
+                  <EVisa />
+                </RequireAuth>
+              } />
               <Route path="/dashboard" element={
                 <RequireAuth>
                   <Dashboard isLoggedIn={isLoggedIn} onLoginRequired={() => navigate('/login')} />
@@ -415,22 +448,6 @@ const AppContent: React.FC = () => {
                 <RequireAuth>
                   <Dashboard isLoggedIn={isLoggedIn} onLoginRequired={() => navigate('/login')} initialTab="travel-score" />
                 </RequireAuth>
-              } />
-              <Route path="/visa-checker" element={
-                <VisaChecker 
-                  isLoggedIn={isLoggedIn}
-                  onLoginRequired={() => navigate('/login')}
-                  onApplyEVisa={(nationalityCode, destinationCode) => {
-                    setEVisaData({ nationalityCode, destinationCode });
-                    if (isLoggedIn) {
-                      navigate(`/evisa?from=${nationalityCode}&to=${destinationCode}`);
-                    } else {
-                      // Store the data and redirect after login
-                      setEVisaApplication(true);
-                      navigate('/login');
-                    }
-                  }}
-                />
               } />
               <Route path="/assistant" element={
                 <RequireAuth>
@@ -467,66 +484,20 @@ const AppContent: React.FC = () => {
                   <Dashboard />
                 </RequireAuth>
               } />
-              <Route path="/evisa" element={
-                <EVisaApplication 
-                  isLoggedIn={isLoggedIn} 
-                  onLoginRequired={() => navigate('/login')}
-                />
-              } />
-              <Route path="/visa/:countryCode" element={
-                <RequireAuth>
-                  <EVisa 
-                    nationalityCode="gb" 
-                    destinationCode={location.pathname.split('/')[2] || 'tr'} 
-                    onCancel={() => navigate('/dashboard')}
-                  />
-                </RequireAuth>
-              } />
-              <Route path="/questionnaire" element={
-                <TravelScoreQuestionnaire 
-                  onSignUp={() => navigate('/signup')} 
-                  isLoggedIn={isLoggedIn} 
-                />
-              } />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/features" element={<Features />} />
-              <Route path="/pricing" element={
-                <Pricing
-                  isLoggedIn={isLoggedIn}
-                  onGetStarted={() => navigate('/login')}
-                  onSubscribe={handleSubscribe}
-                />
-              } />
-              <Route path="/checkout" element={
-                <RequireAuth>
-                  <Checkout 
-                    subscriptionType={checkoutPlan as 'premium' | 'enterprise'} 
-                    billingCycle={checkoutCycle}
-                    onBack={() => navigate('/pricing')}
-                    onComplete={handleCheckoutComplete}
-                  />
-                </RequireAuth>
-              } />
-              <Route path="/subscription-success" element={
-                <RequireAuth>
-                  <SubscriptionSuccess
-                    subscriptionType={checkoutPlan as 'premium' | 'enterprise'}
-                    billingCycle={checkoutCycle}
-                    onContinue={() => navigate('/dashboard')}
-                  />
-                </RequireAuth>
-              } />
+              <Route path="/questionnaire" element={<TravelScoreQuestionnaire onSignUp={() => navigate('/signup')} isLoggedIn={isLoggedIn} />} />
+              <Route path="/checkout" element={<RequireAuth><Checkout subscriptionType={checkoutPlan as 'premium' | 'enterprise'} billingCycle={checkoutCycle} onBack={() => navigate('/pricing')} onComplete={handleCheckoutComplete} /></RequireAuth>} />
+              <Route path="/subscription-success" element={<RequireAuth><SubscriptionSuccess subscriptionType={checkoutPlan as 'premium' | 'enterprise'} billingCycle={checkoutCycle} onContinue={() => navigate('/dashboard')} /></RequireAuth>} />
               <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/blogs/:countryCode" element={
-                <RequireAuth>
-                  <Blogs />
-                </RequireAuth>
-              } />
-              <Route path="/admin" element={
-                <RequireAuth>
-                  <AdminDashboard />
-                </RequireAuth>
-              } />
+              <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
+              <Route path="/visa/:countryCode" element={<VisaProduct />} />
+              <Route path="/visa/browse" element={<VisaProductBrowser />} />
+              <Route path="/visa/apply/:nationality/:destination" element={<VisaApplicationPage />} />
+              <Route path="/payment/:applicationId" element={<PaymentPage />} />
+              <Route path="/payment-test" element={<PaymentPage />} />
+              <Route path="/visa/confirmation/:applicationId" element={<VisaConfirmationPage />} />
+              <Route path="/blogs" element={<BlogListing />} />
+              <Route path="/blog/:id" element={<BlogDetail />} />
+              <Route path="/blogs/:countryCode" element={<RequireAuth><Blogs /></RequireAuth>} />
               <Route path="*" element={<NotFound onGoHome={() => navigate('/')} />} />
             </Routes>
             </motion.div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import authService from '../lib/api/auth';
 import { useNavigate } from 'react-router-dom';
-import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaApple } from 'react-icons/fa';
 
 interface SignUpProps {
   onSignUp: (email: string, password: string, name: string) => void;
@@ -15,6 +15,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [nationality, setNationality] = useState('');
+  const [residency, setResidency] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -49,7 +50,8 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
       // Call our auth service to sign up
       const { user, error } = await authService.signUp(email, password, {
         full_name: name,
-        nationality: nationality || undefined,
+        nationality: nationality || '',
+        residency: residency || '',
       });
       
       if (error) {
@@ -97,6 +99,34 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
       // This line might not execute as the redirect happens from the auth service
     } catch (err) {
       console.error("Unexpected error during Google signup:", err);
+      setError('An unexpected error occurred. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      console.log("Initiating Apple signup");
+      const { error } = await authService.signInWithApple();
+      
+      if (error) {
+        console.error("Apple signup error:", error);
+        if (error.message === "Unsupported provider: provider is not enabled") {
+          setError("Apple login is currently unavailable. Please sign up with email and password instead.");
+        } else {
+          setError(`Failed to sign up with Apple: ${error.message}`);
+        }
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log("Apple signup initiated - redirecting to Apple");
+      // No need to navigate - OAuth redirection will handle it
+    } catch (err) {
+      console.error("Unexpected error during Apple signup:", err);
       setError('An unexpected error occurred. Please try again.');
       setIsLoading(false);
     }
@@ -225,6 +255,25 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
                   </p>
                 </div>
                 
+                <div>
+                  <label htmlFor="residency" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Country of Residence (Optional)
+                  </label>
+                  <input
+                    id="residency"
+                    name="residency"
+                    type="text"
+                    autoComplete="country"
+                    className="appearance-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10"
+                    placeholder="e.g. United States"
+                    value={residency}
+                    onChange={(e) => setResidency(e.target.value)}
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Your current country of residence
+                  </p>
+                </div>
+                
                 <div className="relative">
                   <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Password
@@ -335,7 +384,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
                     type="button"
                     onClick={handleGoogleSignUp}
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 mb-3"
                   >
                     <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -344,6 +393,16 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
                       <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                     </svg>
                     Sign up with Google
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleAppleSignUp}
+                    disabled={isLoading}
+                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  >
+                    <FaApple className="h-5 w-5 mr-2" />
+                    Sign up with Apple
                   </button>
                 </div>
               </div>

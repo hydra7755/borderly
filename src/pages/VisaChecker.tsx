@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import SharedVisaChecker from '../components/VisaChecker'; // Corrected import path
 
 // Define props expected by the page wrapper, if any (might need adjustment)
@@ -24,7 +24,7 @@ const VisaCheckerPage: React.FC<VisaCheckerPageProps> = ({
       onApplyEVisa(nationalityCode, destinationCode);
     } else {
       // Default behavior if no prop is passed, e.g., navigate
-      navigate('/evisa', { state: { nationalityCode, destinationCode } });
+      navigate(`/apply/${nationalityCode}/${destinationCode}`);
     }
   };
 
@@ -39,19 +39,19 @@ const VisaCheckerPage: React.FC<VisaCheckerPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-950 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl md:text-4xl font-bold text-center text-gray-900 dark:text-white mb-8">
           Visa Requirement Checker
-            </h1>
+        </h1>
         <SharedVisaChecker 
           // Pass necessary props down to the shared component
           // Adjust these based on what SharedVisaChecker actually needs
           onApplyEVisa={handleApplyEVisa} 
           // isLoggedIn={isLoggedIn} // Pass if needed
           // onLoginRequired={handleLoginRedirect} // Pass if needed
-              />
-              </div>
+        />
+      </div>
     </div>
   );
 };

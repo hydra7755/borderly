@@ -6,6 +6,9 @@ interface ImportMetaEnv {
   VITE_SUPABASE_ANON_KEY: string;
 }
 
+// Singleton instance
+let supabaseInstance: any = null;
+
 // Get environment variables and ensure they're properly formatted
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -24,7 +27,7 @@ if (!cleanedSupabaseUrl || !cleanedSupabaseAnonKey) {
 
 // Create a mock Supabase client for development
 const createMockClient = () => {
-  console.log("Creating mock Supabase client for development");
+  console.warn("⚠️ USING MOCK SUPABASE CLIENT - visa requirements will NOT be accurate ⚠️");
   
   const mockData: { [key: string]: { [id: string]: any } } = {
     profiles: {}
@@ -352,38 +355,66 @@ const createMockClient = () => {
   };
 };
 
-// Check if we're in development mode or if Supabase URL/key are not available
-const isDevelopment = import.meta.env.MODE === 'development';
-const missingSupabaseConfig = !cleanedSupabaseUrl || !cleanedSupabaseAnonKey;
+/**
+ * Get Supabase client - implements singleton pattern to prevent multiple instances
+ */
+const getSupabaseClient = () => {
+  // Return existing instance if already created
+  if (supabaseInstance) {
+    return supabaseInstance;
+  }
 
-// Add explicit logging
-console.log(`[SupabaseClient] Missing config? ${missingSupabaseConfig}`);
-console.log(`[SupabaseClient] Mode: ${import.meta.env.MODE}`);
+  // Check if we're in development mode or if Supabase URL/key are not available
+  const isDevelopment = import.meta.env.MODE === 'development';
+  const missingSupabaseConfig = !cleanedSupabaseUrl || !cleanedSupabaseAnonKey;
 
-// Prioritize REAL client if config is present, otherwise use mock (especially in dev without config)
-export const supabase = missingSupabaseConfig
-  ? (() => { 
-      console.log("[SupabaseClient] Using MOCK client because config is missing.");
-      return createMockClient(); 
-    })()
-  : (() => {
-      console.log("[SupabaseClient] Using REAL client because config is present.");
-      return createClient(cleanedSupabaseUrl, cleanedSupabaseAnonKey);
-    })();
+  if (missingSupabaseConfig) {
+    console.error("🚫 CRITICAL ERROR: Missing Supabase configuration!");
+    console.error("Supabase URL:", cleanedSupabaseUrl ? "Provided" : "MISSING");
+    console.error("Supabase Key:", cleanedSupabaseAnonKey ? "Provided" : "MISSING");
+    console.error("This will cause visa requirements to not work correctly!");
+  }
 
-// Test the connection on client creation
+  // Create and cache the instance
+  if (missingSupabaseConfig) {
+    console.warn("[SupabaseClient] Using MOCK client because config is missing.");
+    supabaseInstance = createMockClient();
+  } else {
+    console.log("[SupabaseClient] Using REAL client with URL:", cleanedSupabaseUrl.substring(0, 25) + "...");
+    try {
+      supabaseInstance = createClient(cleanedSupabaseUrl, cleanedSupabaseAnonKey);
+    } catch (error) {
+      console.error("Failed to create Supabase client with provided credentials:", error);
+      console.warn("Falling back to mock client due to initialization error");
+      supabaseInstance = createMockClient();
+    }
+  }
+
+  return supabaseInstance;
+};
+
+// Export the singleton instance getter
+export const supabase = getSupabaseClient();
+
+// Test the connection on client creation (executed only once)
 (async () => {
   try {
-    // Use a simple check without aggregate functions
-    const { error } = await supabase.from('profiles').select('id').limit(1);
+    console.log("Testing Supabase connection...");
+    // Use a simple select query instead of count(*) to avoid PGRST100 error
+    const { data, error } = await supabase
+      .from('visa_requirements') // Use a table known to exist
+      .select('passport') // Use the correct lowercase column name
+      .limit(1);                 // Limit to 1 row for efficiency
     
     if (error) {
-      console.error('Supabase connection test failed:', error);
+      console.error('⚠️ Supabase connection test failed during initialization:', error);
+      console.warn('This may cause visa requirements functionality to not work correctly.');
     } else {
-      console.log('Supabase connection successful');
+      console.log('✅ Supabase connection successful during initialization (checked passport column)');
     }
   } catch (err) {
-    console.error('Supabase initialization error:', err);
+    console.error('⚠️ Supabase initialization error during connection test:', err);
+    console.warn('This may cause visa requirements functionality to not work correctly.');
   }
 })();
 

@@ -1,9 +1,49 @@
-import { User, Session, AuthError } from '@supabase/supabase-js';
+import { User } from '../../types/user';
+import { Session } from '../../types/auth';
+import { AuthError } from '@supabase/supabase-js';
 import supabase from '../supabase/client';
 
 // Define mock types if needed, ensuring they align with User/Session structure
-type MockUser = User; // Use the actual User type for consistency
-type MockSession = Session; // Use the actual Session type
+type MockUser = User;
+type MockSession = Session;
+
+// Helper function to convert Supabase session to our custom Session type
+const convertSupabaseSession = (supabaseSession: any): Session | null => {
+  if (!supabaseSession) return null;
+  
+  const user = convertSupabaseUser(supabaseSession.user);
+  
+  if (!user) return null;
+  
+  return {
+    access_token: supabaseSession.access_token,
+    refresh_token: supabaseSession.refresh_token || '',
+    expires_in: supabaseSession.expires_in || 3600,
+    expires_at: supabaseSession.expires_at || Math.floor(Date.now() / 1000) + 3600,
+    token_type: supabaseSession.token_type || 'bearer',
+    user: user,
+    provider_token: supabaseSession.provider_token,
+    provider_refresh_token: supabaseSession.provider_refresh_token
+  };
+};
+
+// Helper function to convert Supabase user to our custom User type
+const convertSupabaseUser = (supabaseUser: any): User | null => {
+  if (!supabaseUser) return null;
+  
+  return {
+    id: supabaseUser.id,
+    email: supabaseUser.email || '',
+    full_name: supabaseUser.user_metadata?.full_name || '',
+    nationality: supabaseUser.user_metadata?.nationality || '',
+    residency: supabaseUser.user_metadata?.residency || '',
+    created_at: supabaseUser.created_at || new Date().toISOString(),
+    subscription_tier: supabaseUser.user_metadata?.subscription_tier || 'free',
+    app_metadata: supabaseUser.app_metadata || {},
+    user_metadata: supabaseUser.user_metadata || {},
+    aud: supabaseUser.aud || ''
+  };
+};
 
 /**
  * Auth service for handling authentication with Supabase
@@ -18,34 +58,35 @@ const authService = {
    */
   async signUp(email: string, password: string, userData: { 
     full_name: string;
-    nationality?: string;
-    residency?: string;
-  }): Promise<{ user: User | null; session: Session | null; error: AuthError | null }> {
+    nationality: string;
+    residency: string;
+  }): Promise<{ 
+    user: User | null; 
+    session: Session | null; 
+    error: AuthError | null 
+  }> {
     try {
-      // Mock sign-up for development
+      // Simulate signup for mock environment
       if (import.meta.env.DEV && typeof (supabase.auth as any).signUp !== 'function') {
-        console.warn("DEV MODE: Mock sign-up");
+        console.warn("DEV MODE: Mock signup");
         const mockUser: User = {
-          id: `mock-signup-${Date.now()}`,
+          id: 'mock-user-id-' + Date.now(),
           email: email,
-          app_metadata: { provider: 'email' }, 
-          user_metadata: { full_name: userData.full_name },
-          aud: 'authenticated', 
+          full_name: userData.full_name,
+          nationality: userData.nationality,
+          residency: userData.residency,
           created_at: new Date().toISOString(),
-          // Add potentially missing optional fields if necessary
-          phone: undefined, 
-          updated_at: new Date().toISOString(),
-          email_confirmed_at: new Date().toISOString(), // Assume confirmed in mock
-          last_sign_in_at: new Date().toISOString(),
-          role: 'authenticated'
+          subscription_tier: 'free',
+          app_metadata: {},
+          user_metadata: userData,
+          aud: 'authenticated'
         };
         const mockSession: Session = {
-          access_token: 'mock-signup-token', 
-          refresh_token: 'mock-signup-refresh', 
-          expires_in: 3600, 
+          access_token: 'mock-token',
+          refresh_token: 'mock-refresh',
+          expires_in: 3600,
           token_type: 'bearer',
           user: mockUser,
-          // Add potentially missing optional fields
           provider_token: null,
           provider_refresh_token: null,
           expires_at: Math.floor(Date.now() / 1000) + 3600
@@ -65,7 +106,11 @@ const authService = {
         }
       });
 
-      return { user: data.user, session: data.session, error };
+      // Transform data.user to match our User type
+      const user = data.user ? convertSupabaseUser(data.user) : null;
+      const session = convertSupabaseSession(data.session);
+
+      return { user, session, error };
     } catch (error) {
       console.error("Unexpected signup error:", error);
       return { user: null, session: null, error: error as AuthError };
@@ -90,18 +135,20 @@ const authService = {
         const mockUser: User = {
           id: 'mock-signin-user',
           email: email,
-          app_metadata: {}, user_metadata: { full_name: 'Mock User' },
-          aud: 'authenticated', created_at: new Date().toISOString(),
-          // Fill in other required/optional fields from User type
-          phone: undefined,
-          updated_at: new Date().toISOString(),
-          email_confirmed_at: new Date().toISOString(),
-          last_sign_in_at: new Date().toISOString(),
-          role: 'authenticated'
+          app_metadata: {}, 
+          user_metadata: { full_name: 'Mock User' },
+          aud: 'authenticated', 
+          created_at: new Date().toISOString(),
+          full_name: 'Mock User',
+          nationality: 'US',
+          residency: 'US',
+          subscription_tier: 'free'
         };
         const mockSession: Session = {
-          access_token: 'mock-token', refresh_token: 'mock-refresh', 
-          expires_in: 3600, token_type: 'bearer',
+          access_token: 'mock-token', 
+          refresh_token: 'mock-refresh', 
+          expires_in: 3600, 
+          token_type: 'bearer',
           user: mockUser,
           provider_token: null,
           provider_refresh_token: null,
@@ -111,7 +158,12 @@ const authService = {
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      return { user: data?.user ?? null, session: data?.session ?? null, error };
+      
+      // Convert types to our custom types
+      const user = data?.user ? convertSupabaseUser(data.user) : null;
+      const session = convertSupabaseSession(data?.session);
+      
+      return { user, session, error };
     } catch (err) {
       console.error("Unexpected sign-in error:", err);
       return { user: null, session: null, error: err as AuthError };
@@ -191,6 +243,75 @@ const authService = {
   },
 
   /**
+   * Sign in with Apple OAuth
+   * @returns Promise with the user data or error
+   */
+  async signInWithApple(): Promise<{ 
+    user: User | null; 
+    session: Session | null; 
+    error: AuthError | null 
+  }> {
+    try {
+      console.log("Starting Apple OAuth sign-in process");
+      const currentUrl = window.location.origin;
+      // Make sure the redirect URL is properly formed - must end with /auth/callback
+      const redirectUrl = currentUrl.endsWith('/') 
+        ? `${currentUrl}auth/callback` 
+        : `${currentUrl}/auth/callback`;
+        
+      console.log(`Redirect URL set to: ${redirectUrl}`);
+      
+      // Check if we're in development mode and using mock client
+      const isDevelopmentEnv = import.meta.env.DEV;
+      // Check if the function exists on the actual auth object (might be missing on mock)
+      const usingMockClient = typeof (supabase.auth as any).signInWithOAuth !== 'function' || !supabase.auth.signInWithPassword; 
+      
+      if (isDevelopmentEnv && usingMockClient) {
+        console.warn("DEVELOPMENT MODE: Using mock Supabase client. Real Apple OAuth redirect is skipped.");
+        console.log(`Mock Client: Would normally redirect to Apple and then back to: ${redirectUrl}`);
+        
+        // Simulate ONLY the expected return value if the call were made, NOT the redirect.
+        return { 
+          user: null, // OAuth redirects, no immediate user/session return
+          session: null, 
+          error: null 
+        }; 
+      }
+      
+      // In production or when using real client, use the real Supabase OAuth
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: redirectUrl,
+          // Apple specific options can be added here if needed
+          scopes: 'name email', // Request name and email from Apple
+        }
+      });
+
+      if (error) {
+        console.error("Apple sign in error:", error);
+        return { user: null, session: null, error };
+      }
+
+      console.log("Apple OAuth sign-in initialized successfully", data);
+      // Since OAuth redirects the user, we won't actually reach this point
+      // The user will be redirected to Apple for authentication
+      return { 
+        user: null, 
+        session: null, 
+        error: null 
+      };
+    } catch (error) {
+      console.error("Unexpected error during Apple sign in:", error);
+      return { 
+        user: null, 
+        session: null, 
+        error: error as AuthError 
+      };
+    }
+  },
+
+  /**
    * Sign out the current user
    * @returns Promise with success status
    */
@@ -222,11 +343,12 @@ const authService = {
         if (!mockStoredUser) return { session: null, error: null };
         
         // Reconstruct mock session if user exists
-        const mockUser: User = mockStoredUser as User;
         const mockSession: Session = {
-          access_token: 'mock-session-token', refresh_token: 'mock-refresh-token',
-          expires_in: 3600, token_type: 'bearer',
-          user: mockUser,
+          access_token: 'mock-session-token', 
+          refresh_token: 'mock-refresh-token',
+          expires_in: 3600, 
+          token_type: 'bearer',
+          user: mockStoredUser,
           provider_token: null,
           provider_refresh_token: null,
           expires_at: Math.floor(Date.now() / 1000) + 3600
@@ -235,7 +357,8 @@ const authService = {
       }
 
       const { data, error } = await supabase.auth.getSession();
-      return { session: data?.session ?? null, error: error ?? null };
+      const session = convertSupabaseSession(data?.session);
+      return { session, error: error ?? null };
     } catch (error) {
       console.error("Get session error:", error);
       return { session: null, error: error as AuthError };
@@ -251,12 +374,14 @@ const authService = {
       // Handle mock user for development
       if (import.meta.env.DEV && typeof (supabase.auth as any).getUser !== 'function') {
         console.warn("DEV MODE: Mock getCurrentUser");
-        const mockStoredUser = getCurrentMockUser();
-        return { user: mockStoredUser ? (mockStoredUser as User) : null, error: null };
+        const mockUser = getCurrentMockUser();
+        return { user: mockUser, error: null };
       }
 
       const { data, error } = await supabase.auth.getUser();
-      return { user: data?.user ?? null, error: error ?? null };
+      const user = data?.user ? convertSupabaseUser(data.user) : null;
+      
+      return { user, error };
     } catch (error) {
       console.error("Get user error:", error);
       return { user: null, error: error as AuthError };

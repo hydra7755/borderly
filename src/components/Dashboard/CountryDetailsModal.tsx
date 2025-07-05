@@ -1,5 +1,5 @@
 import React from 'react';
-import { VisaRequirement } from '../../types/visaRequirements';
+import { VisaRequirement } from '../../types/visa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CountryDetailsModalProps {
@@ -20,6 +20,27 @@ const CountryDetailsModal: React.FC<CountryDetailsModalProps> = ({
   onSaveToList
 }) => {
   if (!isOpen) return null;
+
+  // Helper function to get the formatted requirement type
+  const getVisaTypeDisplay = (requirement: string): string => {
+    return requirement.replace('-', ' ').replace(/\b\w/g, char => char.toUpperCase());
+  };
+
+  // Helper function to get duration from requirement type
+  const getDuration = (requirementType: string): string => {
+    switch (requirementType) {
+      case 'visa-free':
+        return '90 days';
+      case 'visa-on-arrival':
+        return '30 days';
+      case 'evisa':
+        return 'Variable';
+      case 'visa-required':
+        return 'As per visa';
+      default:
+        return 'Check with embassy';
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -62,22 +83,16 @@ const CountryDetailsModal: React.FC<CountryDetailsModalProps> = ({
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Status:</span>
-                      <span className="font-medium capitalize">{visaDetails.visaType.replace('-', ' ')}</span>
+                      <span className="font-medium capitalize">{getVisaTypeDisplay(visaDetails.requirement)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Maximum Stay:</span>
-                      <span className="font-medium">{visaDetails.duration}</span>
+                      <span className="font-medium">{getDuration(visaDetails.requirement)}</span>
                     </div>
-                    {visaDetails.notes && (
-                      <div>
-                        <span className="text-gray-600 block mb-1">Notes:</span>
-                        <p className="text-sm bg-white p-2 rounded border border-gray-200">{visaDetails.notes}</p>
-                      </div>
-                    )}
                   </div>
                 </div>
                 
-                {visaDetails.visaType === 'visa-required' && (
+                {visaDetails.requirement === 'visa-required' && (
                   <div className="bg-yellow-50 p-4 rounded-lg">
                     <h4 className="font-medium text-lg mb-2 text-yellow-800">Visa Requirements</h4>
                     <p className="text-sm text-yellow-700">
@@ -86,7 +101,7 @@ const CountryDetailsModal: React.FC<CountryDetailsModalProps> = ({
                   </div>
                 )}
                 
-                {visaDetails.visaType === 'e-visa' && (
+                {visaDetails.requirement === 'evisa' && (
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h4 className="font-medium text-lg mb-2 text-blue-800">eVisa Information</h4>
                     <p className="text-sm text-blue-700">

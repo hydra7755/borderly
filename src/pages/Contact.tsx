@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { sendEmail, sendAcknowledgementEmail } from '../services/emailService';
 
 const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -23,13 +24,29 @@ const Contact: React.FC = () => {
     setSubmitError('');
     
     try {
-      // In a real app, this would send data to a server
-      // For this implementation, we'll simulate a server call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Format the HTML content for the email to support
+      const htmlContent = `
+        <h2>New Contact Form Submission</h2>
+        <p><strong>Name:</strong> ${formData.name}</p>
+        <p><strong>Email:</strong> ${formData.email}</p>
+        <p><strong>Subject:</strong> ${formData.subject}</p>
+        <p><strong>Message:</strong></p>
+        <p>${formData.message.replace(/\n/g, '<br>')}</p>
+      `;
+      
+      // Send the form data to support
+      await sendEmail(
+        'contact@borderly.net', 
+        `New Contact Form: ${formData.subject}`,
+        htmlContent
+      );
+      
+      // Send an acknowledgement email to the user
+      await sendAcknowledgementEmail(formData.email, formData.name);
       
       console.log('Contact form submitted:', {
         ...formData,
-        receiverEmail: 'info@travelwithydra.com'
+        receiverEmail: 'contact@borderly.net'
       });
       
       setSubmitSuccess(true);
@@ -195,7 +212,7 @@ const Contact: React.FC = () => {
                 <div className="ml-4">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white">Email</h3>
                   <p className="mt-1 text-gray-600 dark:text-gray-400">All inquiries are sent to:</p>
-                  <a href="mailto:info@travelwithydra.com" className="mt-1 text-primary-600 dark:text-primary-400 hover:underline">info@travelwithydra.com</a>
+                  <a href="mailto:contact@borderly.net" className="mt-1 text-primary-600 dark:text-primary-400 hover:underline">contact@borderly.net</a>
                 </div>
               </div>
               

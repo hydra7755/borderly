@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCR API Tester</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #2563eb;
+    }
+    h2 {
+      color: #1e40af;
+      margin-top: 30px;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      background-color: #f9fafb;
+    }
+    pre {
+      background-color: #f1f5f9;
+      padding: 12px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: #1d4ed8;
+    }
+    input[type="file"] {
+      margin: 10px 0;
+    }
+    .success {
+      color: #16a34a;
+      font-weight: bold;
+    }
+    .error {
+      color: #dc2626;
+      font-weight: bold;
+    }
+    .log {
+      height: 200px;
+      overflow-y: auto;
+      background-color: #000;
+      color: #fff;
+      padding: 8px;
+      font-family: monospace;
+      margin-top: 20px;
+    }
+    .log-entry {
+      margin: 4px 0;
+    }
+    .log-info { color: #93c5fd; }
+    .log-success { color: #86efac; }
+    .log-error { color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <h1>OCR API Tester</h1>
+  <p>This page tests the OCR API endpoints for TravelScore application.</p>
+  
+  <h2>API Health Check</h2>
+  <div class="card">
+    <p>Test if the OCR API is running and accessible.</p>
+    <button id="testHealth">Test Health Endpoint</button>
+    <div id="healthResult"></div>
+  </div>
+  
+  <h2>OCR Processing Test</h2>
+  <div class="card">
+    <p>Upload an image to test the OCR processing.</p>
+    <input type="file" id="fileInput" accept="image/*">
+    <button id="processImage">Process Image</button>
+    <div id="uploadResult"></div>
+  </div>
+  
+  <h2>API Configuration</h2>
+  <div class="card">
+    <p>Current API settings:</p>
+    <div id="apiConfig"></div>
+  </div>
+  
+  <h2>Console Output</h2>
+  <div class="log" id="consoleLog"></div>
+  
+  <script>
+    // Configuration - can be changed here
+    const API_BASE_URL = 'http://localhost:5175';
+    const API_ENDPOINTS = {
+      health: '/api/health',
+      ocrProcess: '/api/passport-ocr'
+    };
+    
+    // Log functions
+    const log = {
+      container: document.getElementById('consoleLog'),
+      info: function(message) {
+        this.addEntry(message, 'info');
+      },
+      success: function(message) {
+        this.addEntry(message, 'success');
+      },
+      error: function(message) {
+        this.addEntry(message, 'error');
+      },
+      addEntry: function(message, type) {
+        const entry = document.createElement('div');
+        entry.className = `log-entry log-${type}`;
+        entry.textContent = `[${new Date().toISOString()}] ${message}`;
+        this.container.appendChild(entry);
+        this.container.scrollTop = this.container.scrollHeight;
+      }
+    };
+    
+    // Display API configuration
+    document.getElementById('apiConfig').innerHTML = `
+      <pre>
+API_BASE_URL: ${API_BASE_URL}
+Health Endpoint: ${API_BASE_URL}${API_ENDPOINTS.health}
+OCR Process Endpoint: ${API_BASE_URL}${API_ENDPOINTS.ocrProcess}
+      </pre>
+    `;
+    
+    // Health Check
+    document.getElementById('testHealth').addEventListener('click', async () => {
+      const resultDiv = document.getElementById('healthResult');
+      resultDiv.innerHTML = '<p>Testing health endpoint...</p>';
+      log.info(`Testing health endpoint: ${API_BASE_URL}${API_ENDPOINTS.health}`);
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.health}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+          resultDiv.innerHTML = `
+            <p class="success">✅ API is healthy</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+          log.success(`Health check successful: ${response.status}`);
+        } else {
+          resultDiv.innerHTML = `
+            <p class="error">❌ API returned an error</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+          log.error(`Health check failed: ${response.status}`);
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <p class="error">❌ Could not connect to API</p>
+          <p>${error.message}</p>
+        `;
+        log.error(`Health check error: ${error.message}`);
+      }
+    });
+    
+    // OCR Processing
+    document.getElementById('processImage').addEventListener('click', async () => {
+      const fileInput = document.getElementById('fileInput');
+      const resultDiv = document.getElementById('uploadResult');
+      
+      if (!fileInput.files || fileInput.files.length === 0) {
+        resultDiv.innerHTML = '<p class="error">Please select a file first</p>';
+        log.error('No file selected');
+        return;
+      }
+      
+      const file = fileInput.files[0];
+      log.info(`Processing file: ${file.name} (${file.size} bytes)`);
+      resultDiv.innerHTML = '<p>Processing image...</p>';
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+        log.info(`Sending to ${API_BASE_URL}${API_ENDPOINTS.ocrProcess}`);
+        const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ocrProcess}`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          if (response.ok) {
+            resultDiv.innerHTML = `
+              <p class="success">✅ OCR processing successful</p>
+              <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            log.success('OCR processing successful');
+          } else {
+            resultDiv.innerHTML = `
+              <p class="error">❌ OCR processing failed</p>
+              <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            log.error(`OCR processing failed: ${response.status}`);
+          }
+        } else {
+          const text = await response.text();
+          resultDiv.innerHTML = `
+            <p class="error">❌ Response is not JSON</p>
+            <pre>${text.substring(0, 500)}</pre>
+          `;
+          log.error('Response is not JSON');
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <p class="error">❌ Could not connect to API</p>
+          <p>${error.message}</p>
+        `;
+        log.error(`Error: ${error.message}`);
+      }
+    });
+    
+    // Initialize
+    window.addEventListener('load', () => {
+      log.info('OCR API Tester loaded');
+      log.info(`API URL: ${API_BASE_URL}`);
+    });
+  </script>
+</body>
+</html> 

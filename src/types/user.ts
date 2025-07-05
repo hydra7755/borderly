@@ -7,6 +7,9 @@ export interface User {
   created_at: string;
   subscription_tier: 'free' | 'monthly' | 'lifetime';
   stripe_customer_id?: string;
+  app_metadata: any;
+  user_metadata: any;
+  aud: string;
 }
 
 export interface UserProfile extends User {

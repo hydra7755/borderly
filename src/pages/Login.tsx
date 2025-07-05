@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import authService from '../lib/api/auth';
 import { useNavigate } from 'react-router-dom';
-import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaApple } from 'react-icons/fa';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => void;
@@ -81,6 +81,34 @@ const Login: React.FC<LoginProps> = ({ onLogin, onNavigateToSignUp }) => {
       // This line might not execute as the redirect happens from the auth service
     } catch (err) {
       console.error("Unexpected error during Google sign-in:", err);
+      setError('An unexpected error occurred. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      console.log("Initiating Apple sign-in");
+      const { error } = await authService.signInWithApple();
+      
+      if (error) {
+        console.error("Apple sign-in error:", error);
+        if (error.message === "Unsupported provider: provider is not enabled") {
+          setError("Apple login is currently unavailable. Please sign in with email and password instead.");
+        } else {
+          setError(`Failed to sign in with Apple: ${error.message}`);
+        }
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log("Apple sign-in initiated - redirecting to Apple");
+      // No need to navigate - OAuth redirection will handle it
+    } catch (err) {
+      console.error("Unexpected error during Apple sign-in:", err);
       setError('An unexpected error occurred. Please try again.');
       setIsLoading(false);
     }
@@ -316,7 +344,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onNavigateToSignUp }) => {
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={isLoading}
-                  className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 mb-3"
                 >
                   <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -325,6 +353,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, onNavigateToSignUp }) => {
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                   </svg>
                   Sign in with Google
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAppleSignIn}
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  <FaApple className="h-5 w-5 mr-2" />
+                  Sign in with Apple
                 </button>
               </div>
             </div>

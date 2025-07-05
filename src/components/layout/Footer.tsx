@@ -11,12 +11,12 @@ export const Footer: React.FC = () => {
           <div className="col-span-1 md:col-span-1">
             <div className="flex items-center space-x-2 mb-4">
               <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center text-white font-bold text-sm">
-                TS
+                BL
               </div>
-              <span className="text-lg font-bold text-gray-900 dark:text-white">TravelScore</span>
+              <span className="text-lg font-bold text-gray-900 dark:text-white">Borderly</span>
             </div>
             <p className="text-gray-600 dark:text-gray-400 text-sm">
-              Unlock your global mobility potential with TravelScore - the smarter way to understand and improve your passport strength.
+              Unlock your global mobility potential with Borderly - the smarter way to understand and improve your passport strength.
             </p>
           </div>
           
@@ -44,6 +44,35 @@ export const Footer: React.FC = () => {
               <li>
                 <a href="/contact" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
                   Contact
+                </a>
+              </li>
+            </ul>
+          </div>
+          
+          {/* Blogs Section - New */}
+          <div className="col-span-1">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-4">
+              Travel Blogs
+            </h3>
+            <ul className="space-y-2">
+              <li>
+                <a href="/blogs" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                  All Blogs
+                </a>
+              </li>
+              <li>
+                <a href="/blogs/category/visa-tips" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                  Visa Tips
+                </a>
+              </li>
+              <li>
+                <a href="/blogs/category/destinations" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                  Top Destinations
+                </a>
+              </li>
+              <li>
+                <a href="/blogs/category/travel-guides" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                  Travel Guides
                 </a>
               </li>
             </ul>

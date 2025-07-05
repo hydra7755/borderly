@@ -47,6 +47,39 @@ interface EVisaReviewProps {
 }
 
 const EVisaReview: React.FC<EVisaReviewProps> = ({ data, onSubmit, onBack }) => {
+  // Create a safe copy of the data without sensitive information
+  const safeData = React.useMemo(() => {
+    const cleanData = { ...data };
+    
+    // Handle File objects to prevent displaying long base64 strings
+    if (cleanData.passportScan) {
+      // Just keep the name and type, not the full content
+      cleanData.passportScan = new File(
+        [new Blob()], // Empty content
+        cleanData.passportScan.name,
+        { type: cleanData.passportScan.type }
+      );
+    }
+    
+    if (cleanData.photoId) {
+      // Just keep the name and type, not the full content
+      cleanData.photoId = new File(
+        [new Blob()], // Empty content
+        cleanData.photoId.name,
+        { type: cleanData.photoId.type }
+      );
+    }
+    
+    // Handle additional documents
+    if (cleanData.additionalDocuments && cleanData.additionalDocuments.length > 0) {
+      cleanData.additionalDocuments = cleanData.additionalDocuments.map(doc => 
+        new File([new Blob()], doc.name, { type: doc.type })
+      );
+    }
+    
+    return cleanData;
+  }, [data]);
+
   // Format date to be more readable
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -81,9 +114,9 @@ const EVisaReview: React.FC<EVisaReviewProps> = ({ data, onSubmit, onBack }) => 
   
   // Estimated processing time based on destination and purpose
   const getEstimatedProcessingTime = () => {
-    if (data.purpose === 'tourism') {
+    if (safeData.purpose === 'tourism') {
       return '3-5 business days';
-    } else if (data.purpose === 'business') {
+    } else if (safeData.purpose === 'business') {
       return '5-7 business days';
     } else {
       return '7-10 business days';
@@ -134,8 +167,8 @@ const EVisaReview: React.FC<EVisaReviewProps> = ({ data, onSubmit, onBack }) => 
           <div className="flex items-center mb-4">
             <div className="w-8 h-8 rounded-full overflow-hidden mr-3">
               <img 
-                src={getFlagUrl(data.nationality, 64)} 
-                alt={data.nationality} 
+                src={getFlagUrl(safeData.nationality, 64)} 
+                alt={safeData.nationality} 
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
@@ -143,15 +176,15 @@ const EVisaReview: React.FC<EVisaReviewProps> = ({ data, onSubmit, onBack }) => 
             <div className="mx-2">→</div>
             <div className="w-8 h-8 rounded-full overflow-hidden mr-3">
               <img 
-                src={getFlagUrl(data.destination, 64)} 
-                alt={data.destination} 
+                src={getFlagUrl(safeData.destination, 64)} 
+                alt={safeData.destination} 
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
             </div>
             <div className="ml-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {getDaysBetween(data.entryDate, data.exitDate)} day stay
+                {getDaysBetween(safeData.entryDate, safeData.exitDate)} day stay
               </span>
             </div>
           </div>
@@ -159,19 +192,19 @@ const EVisaReview: React.FC<EVisaReviewProps> = ({ data, onSubmit, onBack }) => 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Purpose:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{data.purpose.charAt(0).toUpperCase() + data.purpose.slice(1)}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{safeData.purpose.charAt(0).toUpperCase() + safeData.purpose.slice(1)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Entry Date:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{formatDate(data.entryDate)}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{formatDate(safeData.entryDate)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Exit Date:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{formatDate(data.exitDate)}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{formatDate(safeData.exitDate)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Accommodation:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{data.accommodation || 'Not provided'}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{safeData.accommodation || 'Not provided'}</span>
             </div>
           </div>
         </div>
@@ -188,31 +221,31 @@ const EVisaReview: React.FC<EVisaReviewProps> = ({ data, onSubmit, onBack }) => 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Full Name:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{`${data.firstName} ${data.lastName}`}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{`${safeData.firstName} ${safeData.lastName}`}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Date of Birth:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{formatDate(data.dateOfBirth)}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{formatDate(safeData.dateOfBirth)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Gender:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{data.gender}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{safeData.gender}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Email:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{data.email}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{safeData.email}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Phone:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{data.phone}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{safeData.phone}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Passport Number:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{data.passportNumber}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{safeData.passportNumber}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Passport Expiry:</span>
-              <span className="text-gray-900 dark:text-white font-medium">{formatDate(data.passportExpiryDate)}</span>
+              <span className="text-gray-900 dark:text-white font-medium">{formatDate(safeData.passportExpiryDate)}</span>
             </div>
           </div>
         </div>
@@ -228,27 +261,27 @@ const EVisaReview: React.FC<EVisaReviewProps> = ({ data, onSubmit, onBack }) => 
           
           <div className="space-y-3 text-sm">
             <div className="flex items-center">
-              <CheckCircleIcon className={`h-5 w-5 ${getDocumentStatus(data.passportScan) ? 'text-green-500' : 'text-red-500'}`} />
+              <CheckCircleIcon className={`h-5 w-5 ${getDocumentStatus(safeData.passportScan) ? 'text-green-500' : 'text-red-500'}`} />
               <span className="ml-2 text-gray-700 dark:text-gray-300">Passport Scan</span>
-              {data.passportScan && (
-                <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">{data.passportScan.name}</span>
+              {safeData.passportScan && (
+                <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">{safeData.passportScan.name}</span>
               )}
             </div>
             
             <div className="flex items-center">
-              <CheckCircleIcon className={`h-5 w-5 ${getDocumentStatus(data.photoId) ? 'text-green-500' : 'text-red-500'}`} />
+              <CheckCircleIcon className={`h-5 w-5 ${getDocumentStatus(safeData.photoId) ? 'text-green-500' : 'text-red-500'}`} />
               <span className="ml-2 text-gray-700 dark:text-gray-300">Photo ID</span>
-              {data.photoId && (
-                <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">{data.photoId.name}</span>
+              {safeData.photoId && (
+                <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">{safeData.photoId.name}</span>
               )}
             </div>
             
             <div className="flex items-center">
-              <CheckCircleIcon className={`h-5 w-5 ${data.additionalDocuments.length > 0 ? 'text-green-500' : 'text-gray-400'}`} />
+              <CheckCircleIcon className={`h-5 w-5 ${safeData.additionalDocuments.length > 0 ? 'text-green-500' : 'text-gray-400'}`} />
               <span className="ml-2 text-gray-700 dark:text-gray-300">Supporting Documents</span>
               <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
-                {data.additionalDocuments.length > 0 
-                  ? `${data.additionalDocuments.length} file(s)` 
+                {safeData.additionalDocuments.length > 0 
+                  ? `${safeData.additionalDocuments.length} file(s)` 
                   : 'None (Optional)'}
               </span>
             </div>
@@ -268,20 +301,20 @@ const EVisaReview: React.FC<EVisaReviewProps> = ({ data, onSubmit, onBack }) => 
             <div className="flex justify-between">
               <span className="text-gray-500 dark:text-gray-400">Payment Method:</span>
               <span className="text-gray-900 dark:text-white font-medium">
-                {data.paymentMethod === 'card' ? 'Credit Card' : 
-                 data.paymentMethod === 'paypal' ? 'PayPal' : 'Bank Transfer'}
+                {safeData.paymentMethod === 'card' ? 'Credit Card' : 
+                 safeData.paymentMethod === 'paypal' ? 'PayPal' : 'Bank Transfer'}
               </span>
             </div>
             
-            {data.paymentMethod === 'card' && (
+            {safeData.paymentMethod === 'card' && (
               <>
                 <div className="flex justify-between">
                   <span className="text-gray-500 dark:text-gray-400">Cardholder:</span>
-                  <span className="text-gray-900 dark:text-white font-medium">{data.cardholderName}</span>
+                  <span className="text-gray-900 dark:text-white font-medium">{safeData.cardholderName}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500 dark:text-gray-400">Card Number:</span>
-                  <span className="text-gray-900 dark:text-white font-medium">{getMaskedCardNumber(data.cardNumber)}</span>
+                  <span className="text-gray-900 dark:text-white font-medium">{getMaskedCardNumber(safeData.cardNumber)}</span>
                 </div>
               </>
             )}
@@ -332,7 +365,7 @@ const EVisaReview: React.FC<EVisaReviewProps> = ({ data, onSubmit, onBack }) => 
         </div>
         
         <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-          Your application ID: <span className="font-medium text-gray-700 dark:text-gray-300">{data.applicationId}</span>
+          Your application ID: <span className="font-medium text-gray-700 dark:text-gray-300">{safeData.applicationId}</span>
         </div>
       </div>
       
