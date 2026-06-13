@@ -1,6 +1,10 @@
 import { supabase } from '../lib/supabase/client';
 import { ALL_COUNTRIES } from '../utils/countries';
 import { VisaRequirement } from '../lib/api/visaRequirements';
+import {
+  getVisaRequirementFromCsv,
+  getVisaRequirementsForNationalityFromCsv,
+} from './visaCsvData';
 
 // Special country codes for partially recognized states
 const SPECIAL_COUNTRY_CODES: Record<string, string> = {
@@ -196,7 +200,15 @@ class VisaRequirementsService {
         }
       }
       
-      // Fetch data from API using country names (not codes)
+      // Look up from local CSV dataset first (primary source of truth)
+      const csvResult = getVisaRequirementFromCsv(fromCountry, toCountry);
+      if (csvResult && csvResult.requirement !== 'unknown') {
+        console.log('✅ Found visa requirement in CSV data:', csvResult);
+        sessionStorage.setItem(cacheKey, JSON.stringify(csvResult));
+        return csvResult;
+      }
+
+      // Fetch data from Supabase as secondary source
       console.log(`🌐 Fetching from API for ${fromCountry} -> ${toCountry}...`);
       console.log('Querying Supabase with passport=', fromCountry, 'destination=', toCountry);
             
@@ -239,6 +251,12 @@ class VisaRequirementsService {
       
       // If we reach here, it means data is null (0 rows found) and there was no DB error
       console.log(`ℹ️ No visa requirement record found in database for ${fromCountry} -> ${toCountry}`);
+
+      if (csvResult) {
+        sessionStorage.setItem(cacheKey, JSON.stringify(csvResult));
+        return csvResult;
+      }
+
       // Check for special case ONLY if 0 rows are found
        if (fromCountry.toLowerCase() === 'pakistan' && toCountry.toLowerCase() === 'azerbaijan') {
            // ... (special case handling remains the same)
@@ -442,6 +460,13 @@ class VisaRequirementsService {
     }
 
     try {
+      const csvData = getVisaRequirementsForNationalityFromCsv(
+        nationality.length === 2 ? this.getCountryNameFromCode(nationality) : nationality
+      );
+      if (csvData.length > 0) {
+        return csvData;
+      }
+
       const { data, error } = await supabase
         .from('visa_requirements')
         .select('*')
