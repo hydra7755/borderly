@@ -51,7 +51,7 @@ const AuthCallback: React.FC = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
         
         console.log("[AuthCallback] Attempting to get current session...");
-        const { session, error: sessionError } = await authService.getCurrentSession();
+        const { session, error: sessionError } = await authService.getSession();
 
         console.log("[AuthCallback] Session data:", session);
         console.log("[AuthCallback] Session error:", sessionError);
