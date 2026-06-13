@@ -276,22 +276,77 @@ class VisaRequirementsService {
   }
 
   /**
-   * Get all visa requirements (with pagination)
+   * Get all visa requirements with pagination
    */
   public async getAllVisaRequirements(
     page: number = 1,
-    limit: number = 100
+    limit: number = 10
   ): Promise<VisaRequirement[]> {
-    this.clearCacheIfExpired();
-
-    // Return cached data if available
-    if (this.allRequirementsCache) {
+    // Check if we have a valid cache
+    if (
+      this.allRequirementsCache &&
+      Date.now() - this.lastCacheRefresh < this.CACHE_EXPIRY_MS
+    ) {
+      console.log('Using cached visa requirements');
+      // Calculate slice based on page and limit
       const start = (page - 1) * limit;
       const end = start + limit;
       return this.allRequirementsCache.slice(start, end);
     }
 
     try {
+      // For development mode, use mock data
+      if (import.meta.env.DEV) {
+        console.log("DEV MODE: Using mock visa requirements data");
+        
+        // Mock data for development
+        const mockData: VisaRequirement[] = [
+          {
+            nationality: 'United States',
+            destination: 'Albania',
+            requirement: 'evisa',
+            stay_duration: 90,
+            notes: 'Albania offers eVisa for most nationalities.'
+          },
+          {
+            nationality: 'United States',
+            destination: 'Canada',
+            requirement: 'visa-free',
+            stay_duration: 180,
+            notes: 'US citizens can stay up to 180 days visa-free.'
+          },
+          {
+            nationality: 'United Kingdom',
+            destination: 'United States',
+            requirement: 'eta',
+            stay_duration: 90,
+            notes: 'ESTA required for visa waiver program.'
+          },
+          {
+            nationality: 'Germany',
+            destination: 'France',
+            requirement: 'visa-free',
+            stay_duration: 90,
+            notes: 'EU citizens have freedom of movement.'
+          },
+          {
+            nationality: 'Japan',
+            destination: 'South Korea',
+            requirement: 'visa-free',
+            stay_duration: 90,
+            notes: 'Visa-free travel between Japan and South Korea.'
+          }
+        ];
+        
+        this.allRequirementsCache = mockData;
+        this.lastCacheRefresh = Date.now();
+        
+        // Calculate slice based on page and limit
+        const start = (page - 1) * limit;
+        const end = start + limit;
+        return mockData.slice(start, end);
+      }
+      
       // Calculate offset based on page and limit
       const offset = (page - 1) * limit;
 

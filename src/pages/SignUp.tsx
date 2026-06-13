@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import authService from '../lib/api/auth';
 import { useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash, FaApple } from 'react-icons/fa';
+import supabase from '../lib/supabase/client';
 
 interface SignUpProps {
   onSignUp: (email: string, password: string, name: string) => void;
@@ -22,6 +23,22 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [signupComplete, setSignupComplete] = useState(false);
   const navigate = useNavigate();
+
+  // Debug function to test Supabase connection
+  const testConnection = async () => {
+    console.log('🧪 Testing Supabase connection...');
+    console.log('Supabase client:', supabase);
+    
+    try {
+      // Test basic connection
+      const { data, error } = await supabase.auth.getSession();
+      console.log('✅ Connection test successful:', { data, error });
+      setError('Connection test successful! Check console for details.');
+    } catch (err) {
+      console.error('❌ Connection test failed:', err);
+      setError(`Connection test failed: ${err}`);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,9 +78,14 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
       }
       
       if (user) {
-        // Show success message
+        // Show success message and redirect to dashboard
         setSignupComplete(true);
         setIsLoading(false);
+        
+        // Wait a moment then redirect to dashboard
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
       } else {
         setError('Failed to create account. Please try again.');
         setIsLoading(false);
@@ -399,10 +421,19 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
                     type="button"
                     onClick={handleAppleSignUp}
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 mb-3"
                   >
                     <FaApple className="h-5 w-5 mr-2" />
                     Sign up with Apple
+                  </button>
+
+                  {/* Temporary debug button */}
+                  <button
+                    type="button"
+                    onClick={testConnection}
+                    className="w-full flex items-center justify-center px-4 py-2 border border-yellow-300 rounded-md shadow-sm text-sm font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                  >
+                    🧪 Test Supabase Connection
                   </button>
                 </div>
               </div>

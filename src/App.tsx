@@ -9,7 +9,6 @@ import Dashboard from './pages/Dashboard';
 import TravelScoreQuestionnaire from './pages/TravelScoreQuestionnaire';
 import NotFound from './pages/NotFound';
 import EVisa from './pages/EVisa';
-import EVisaApplication from './pages/EVisaApplication';
 import EVisaRedirect from './pages/EVisaRedirect';
 import './App.css';
 import Contact from './pages/Contact';
@@ -26,7 +25,6 @@ import VisaChecker from './pages/VisaChecker';
 import AIAssistant from './pages/AIAssistant';
 import authService from './lib/api/auth';
 import { User } from '@supabase/supabase-js';
-import Blogs from './pages/Blogs';
 import BlogListing from './pages/BlogListing';
 import BlogDetail from './pages/BlogDetail';
 import AdminDashboard from './pages/Admin';
@@ -168,14 +166,14 @@ const AppContent: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Check if user is logged in on initial load
+  // Check authentication status on page load
   useEffect(() => {
     const checkAuth = async () => {
       try {
         setIsLoading(true);
-        const { session, error } = await authService.getCurrentSession();
+        const { session, error: sessionError } = await authService.getSession();
         
-        if (session && !error) {
+        if (session && !sessionError) {
           const { user, error: userError } = await authService.getCurrentUser();
           
           if (user && !userError) {
@@ -497,7 +495,7 @@ const AppContent: React.FC = () => {
               <Route path="/visa/confirmation/:applicationId" element={<VisaConfirmationPage />} />
               <Route path="/blogs" element={<BlogListing />} />
               <Route path="/blog/:id" element={<BlogDetail />} />
-              <Route path="/blogs/:countryCode" element={<RequireAuth><Blogs /></RequireAuth>} />
+              <Route path="/blogs/:countryCode" element={<RequireAuth><BlogListing /></RequireAuth>} />
               <Route path="*" element={<NotFound onGoHome={() => navigate('/')} />} />
             </Routes>
             </motion.div>

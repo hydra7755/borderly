@@ -1,58 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import EVisaApplication from '../components/EVisa/EVisaApplication';
+import VisaApplicationStepper from '../components/EVisa/VisaApplicationStepper';
 import EVisaHeader from '../components/EVisa/EVisaHeader';
-import { useAuth } from '../contexts/AuthContext';
-import { ALL_COUNTRIES } from '../utils/countries';
 
 const EVisa: React.FC = () => {
   const { nationality, destination } = useParams<{ nationality: string; destination: string }>();
-  const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [applicationId, setApplicationId] = useState<string>('');
+  const [applicationId] = useState(() => `evisa-${nationality}-${destination}-${Date.now()}`);
 
+  // Validate params
   useEffect(() => {
-    // Generate a unique application ID
-    const generateApplicationId = () => {
-      const timestamp = new Date().getTime().toString(36);
-      const random = Math.random().toString(36).substring(2, 8);
-      return `app-${nationality?.substring(0, 2)}-${destination?.substring(0, 2)}-${random}${timestamp.substring(timestamp.length - 4)}`;
-    };
-
-    if (nationality && destination) {
-      setApplicationId(generateApplicationId());
+    if (!nationality || !destination) {
+      navigate('/visa-checker');
     }
-  }, [nationality, destination]);
+  }, [nationality, destination, navigate]);
 
-  // Validate country codes
-  useEffect(() => {
-    if (!loading) {
-      // Check if nationality and destination are valid
-      const isValidNationality = ALL_COUNTRIES.some(c => c.code.toLowerCase() === nationality?.toLowerCase());
-      const isValidDestination = ALL_COUNTRIES.some(c => c.code.toLowerCase() === destination?.toLowerCase());
-
-      if (!nationality || !destination || !isValidNationality || !isValidDestination) {
-        // Redirect to visa checker if parameters are invalid
-        navigate('/visa-checker');
-      }
-    }
-  }, [nationality, destination, loading, navigate]);
-
-  // Redirect to login if user is not authenticated
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/login', { state: { redirect: `/evisa/${nationality}/${destination}` } });
-    }
-  }, [user, loading, navigate, nationality, destination]);
-
-  if (loading || !nationality || !destination) {
+  if (!nationality || !destination) {
     return (
       <div className="min-h-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
       </div>
     );
   }
+
+  const handleApplicationComplete = (travelers: any[]) => {
+    console.log('Application completed with travelers:', travelers);
+    navigate('/dashboard');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -72,13 +47,8 @@ const EVisa: React.FC = () => {
 
           {/* Main application component */}
           <div className="p-6">
-            <EVisaApplication 
-              userEmail={user?.email}
-              nationalityCode={nationality}
-              destinationCode={destination}
-              applicationId={applicationId}
-              onComplete={() => navigate('/dashboard')}
-              onViewApplications={() => navigate('/applications')}
+            <VisaApplicationStepper 
+              onComplete={handleApplicationComplete}
             />
           </div>
         </motion.div>

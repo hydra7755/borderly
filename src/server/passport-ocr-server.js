@@ -31,7 +31,7 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB size limit
 });
@@ -59,12 +59,12 @@ app.post('/api/passport-ocr', upload.single('file'), async (req, res) => {
     console.log(`Starting OCR processing of ${filePath}`);
     const { data } = await worker.recognize(filePath);
     await worker.terminate();
-    
+
     // Clean up the uploaded file
     fs.unlinkSync(filePath);
     
     // Return the OCR result
-    res.status(200).json({ 
+      res.status(200).json({ 
       text: data.text,
       confidence: data.confidence,
       source: 'mock-ocr-server'

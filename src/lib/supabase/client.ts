@@ -9,28 +9,93 @@ interface ImportMetaEnv {
 // Singleton instance
 let supabaseInstance: any = null;
 
-// Get environment variables and ensure they're properly formatted
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+/**
+ * Get Supabase client - implements singleton pattern to prevent multiple instances
+ */
+const getSupabaseClient = () => {
+  // Return existing instance if already created
+  if (supabaseInstance) {
+    return supabaseInstance;
+  }
 
-// Clean the keys in case there are newlines or extra spaces
-const cleanedSupabaseUrl = supabaseUrl.trim();
-const cleanedSupabaseAnonKey = supabaseAnonKey.trim().replace(/\r?\n|\r/g, '');
+  // For development, always use a mock client
+  if (import.meta.env.DEV) {
+    console.log("🔧 Development mode detected: Using mock Supabase client");
+    supabaseInstance = createMockClient();
+    return supabaseInstance;
+  }
 
-// Log connection details for debugging (remove in production)
-console.log('Supabase URL:', cleanedSupabaseUrl);
-console.log('Supabase Key Length:', cleanedSupabaseAnonKey.length);
+  // Get environment variables with multiple fallback sources
+  const getEnvVar = (key: string, fallback: string = ''): string => {
+    // Try Vite environment variables first
+    const viteEnv = import.meta.env[key];
+    if (viteEnv) return viteEnv;
+    
+    // Try window._env_ (loaded from env-config.js)
+    const windowEnv = (window as any)?._env_?.[key];
+    if (windowEnv) return windowEnv;
+    
+    // Try alternative key naming
+    const altKey = key.replace('VITE_', 'REACT_APP_');
+    const altEnv = (window as any)?._env_?.[altKey];
+    if (altEnv) return altEnv;
+    
+    return fallback;
+  };
 
-if (!cleanedSupabaseUrl || !cleanedSupabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+  const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', '');
+  const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', '');
 
-// Create a mock Supabase client for development
+  // Clean the keys in case there are newlines or extra spaces
+  const cleanedSupabaseUrl = supabaseUrl.trim();
+  const cleanedSupabaseAnonKey = supabaseAnonKey.trim().replace(/\r?\n|\r/g, '');
+
+  // Log connection details for debugging
+  console.log('🔧 Supabase Configuration:');
+  console.log('URL:', cleanedSupabaseUrl);
+  console.log('Key Length:', cleanedSupabaseAnonKey.length);
+
+  // Check if we have valid Supabase configuration
+  const hasValidConfig = cleanedSupabaseUrl && cleanedSupabaseAnonKey;
+
+  if (!hasValidConfig) {
+    console.error("🚫 CRITICAL ERROR: Missing Supabase configuration!");
+    console.error("Using mock client for development");
+    
+    // Create a basic mock client for development
+    supabaseInstance = createMockClient();
+    return supabaseInstance;
+  }
+
+  console.log("[SupabaseClient] Creating REAL client with URL:", cleanedSupabaseUrl.substring(0, 30) + "...");
+  try {
+    // Create the real Supabase client with enhanced auth options
+    supabaseInstance = createClient(cleanedSupabaseUrl, cleanedSupabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce'
+      }
+    });
+    
+    console.log("✅ Supabase client created successfully");
+  } catch (error) {
+    console.error("Failed to create Supabase client:", error);
+    console.warn("Falling back to mock client");
+    supabaseInstance = createMockClient();
+  }
+
+  return supabaseInstance;
+};
+
+// Create a mock client for when Supabase is not configured
 const createMockClient = () => {
-  console.warn("⚠️ USING MOCK SUPABASE CLIENT - visa requirements will NOT be accurate ⚠️");
+  console.warn("⚠️ USING MOCK SUPABASE CLIENT - authentication will be simulated ⚠️");
   
   const mockData: { [key: string]: { [id: string]: any } } = {
-    profiles: {}
+    profiles: {},
+    users: {}
   };
   
   // Load any existing data from localStorage
@@ -44,378 +109,195 @@ const createMockClient = () => {
     }
   }
   
-  // Save mock data to localStorage
-  const saveMockData = () => {
+  // Save data to localStorage
+  const saveData = () => {
     localStorage.setItem(localStorageKey, JSON.stringify(mockData));
   };
-  
+
+  // Mock client implementation
   return {
-    from: (table: string) => {
-      // Initialize table if it doesn't exist
-      if (!mockData[table]) {
-        mockData[table] = {};
-      }
-      
-      return {
-        select: (columns = '*', options?: { count?: 'exact' }) => {
-          let filteredData = Object.values(mockData[table]);
-          let equalsFilter: { column: string; value: any } | null = null;
-          let count: number | null = null;
-
-          if (options?.count === 'exact') {
-            // If count is requested, calculate it
-            count = filteredData.length;
-            // Return structure for count query
-            return Promise.resolve({ data: [{ count }], error: null });
-          }
-
-          const queryBuilder = {
-            eq: (column: string, value: any) => {
-              equalsFilter = { column, value };
-              // Filter data based on eq
-              filteredData = filteredData.filter((item: any) => item[equalsFilter!.column] === equalsFilter!.value);
-              return queryBuilder; // Allow chaining further filters if needed
-            },
-            single: () => {
-              const result = filteredData.length > 0 ? filteredData[0] : null;
-              return Promise.resolve({
-                data: result,
-                error: result ? null : new Error('No matching record found')
-              });
-            },
-            // Add a default promise resolution that returns multiple items
-            then: (resolve: (value: { data: any[] | null; error: Error | null }) => void) => {
-              resolve({ data: filteredData, error: null });
-            }
-          };
-          // Return the builder for chaining or direct resolution
-          // Wrap in a way that it can be awaited directly or chained
+    auth: {
+      signUp: async ({ email, password, options = {} }: { email: string; password: string; options?: any }) => {
+        console.log("MOCK: Sign up", { email, options });
+        
+        // Check if user already exists
+        const existingUser = Object.values(mockData.users).find((u: any) => u.email === email);
+        if (existingUser) {
           return { 
-            ...queryBuilder, 
-            // Default resolution returning multiple items if not ended with .single()
-            then: (resolve: (value: { data: any[] | null; error: Error | null }) => void) => resolve({ data: filteredData, error: null }) 
-          } as any; // Using 'as any' here to simplify complex mock typing
-        },
-        update: (data: { [key: string]: any }) => {
-          let equalsFilter: { column: string; value: any } | null = null;
-          
-          return {
-            eq: (column: string, value: any) => {
-              equalsFilter = { column, value };
-              return {
-                select: () => {
-                  const targetIndex = Object.values(mockData[table]).findIndex(
-                    (item: any) => item[equalsFilter!.column] === equalsFilter!.value
-                  );
-                  
-                  if (targetIndex >= 0) {
-                    // Update existing record
-                    const targetKey = Object.keys(mockData[table])[targetIndex];
-                    const updatedItem = {
-                      ...mockData[table][targetKey],
-                      ...data
-                    };
-                    mockData[table][targetKey] = updatedItem;
-                    saveMockData();
-                    
-                    return {
-                      single: () => Promise.resolve({
-                        data: updatedItem,
-                        error: null
-                      })
-                    };
-                  } else {
-                    // Record not found
-                    return {
-                      single: () => Promise.resolve({
-                        data: null,
-                        error: new Error('Record not found')
-                      })
-                    };
-                  }
-                }
-              };
-            }
-          };
-        },
-        insert: (data: { [key: string]: any }) => {
-          // Simple insert implementation
-          const id = data.id || `mock-${Date.now()}`;
-          mockData[table][id] = { ...data, id };
-          saveMockData();
-          
-          return Promise.resolve({
-            data: mockData[table][id],
-            error: null
-          });
-        },
-        // Add delete method
-        delete: () => {
-          let equalsFilter: { column: string; value: any }[] = [];
-          
-          return {
-            eq: (column: string, value: any) => {
-              equalsFilter.push({ column, value });
-              return {
-                eq: (column: string, value: any) => {
-                  equalsFilter.push({ column, value });
-                  return {
-                    then: (resolve: (value: { data: any; error: null }) => void) => {
-                      // Filter records to delete
-                      const keysToDelete: string[] = [];
-                      
-                      Object.entries(mockData[table]).forEach(([key, value]) => {
-                        const shouldDelete = equalsFilter.every(filter => 
-                          value[filter.column] === filter.value
-                        );
-                        
-                        if (shouldDelete) {
-                          keysToDelete.push(key);
-                        }
-                      });
-                      
-                      // Remove the records
-                      keysToDelete.forEach(key => {
-                        delete mockData[table][key];
-                      });
-                      
-                      saveMockData();
-                      resolve({ data: { count: keysToDelete.length }, error: null });
-                    }
-                  };
-                },
-                then: (resolve: (value: { data: any; error: null }) => void) => {
-                  // Same implementation as above, just for a single eq filter
-                  const keysToDelete: string[] = [];
-                  
-                  Object.entries(mockData[table]).forEach(([key, value]) => {
-                    const shouldDelete = equalsFilter.every(filter => 
-                      value[filter.column] === filter.value
-                    );
-                    
-                    if (shouldDelete) {
-                      keysToDelete.push(key);
-                    }
-                  });
-                  
-                  keysToDelete.forEach(key => {
-                    delete mockData[table][key];
-                  });
-                  
-                  saveMockData();
-                  resolve({ data: { count: keysToDelete.length }, error: null });
-                }
-              };
-            }
+            data: { user: null, session: null }, 
+            error: { message: "User already exists", status: 400 } 
           };
         }
-      };
-    },
-    auth: {
-      getUser: () => Promise.resolve({
-        data: { user: { id: 'mock-user', email: 'user@example.com' } },
-        error: null
-      }),
-      signInWithPassword: () => Promise.resolve({
-        data: { user: { id: 'mock-user', email: 'user@example.com' }, session: { access_token: 'mock-token' } },
-        error: null
-      }),
-      signInWithOAuth: ({ provider, options }: { provider: string; options?: { redirectTo?: string } }) => {
-        console.log(`Mock OAuth sign-in with provider: ${provider}, redirectTo: ${options?.redirectTo}`);
-        // In a mock environment, just return success
-        return Promise.resolve({ 
-          data: { provider, url: `https://example.com/oauth/${provider}` }, 
-          error: null 
-        });
+        
+        // Create new user
+        const userId = `mock-user-${Date.now()}`;
+        const user = {
+          id: userId,
+          email,
+          created_at: new Date().toISOString(),
+          user_metadata: options?.data || {},
+          app_metadata: {},
+          aud: "authenticated"
+        };
+        
+        // Store user
+        mockData.users[userId] = user;
+        
+        // Create profile
+        mockData.profiles[userId] = {
+          id: userId,
+          user_id: userId,
+          full_name: options?.data?.full_name || "",
+          nationality: options?.data?.nationality || "",
+          residency: options?.data?.residency || "",
+          created_at: new Date().toISOString(),
+          subscription_tier: "free"
+        };
+        
+        saveData();
+        
+        // Return success
+        return {
+          data: {
+            user,
+            session: {
+              access_token: `mock-token-${userId}`,
+              refresh_token: `mock-refresh-${userId}`,
+              expires_in: 3600,
+              expires_at: Math.floor(Date.now() / 1000) + 3600,
+              token_type: "bearer",
+              user
+            }
+          },
+          error: null
+        };
       },
-      updateUser: () => Promise.resolve({
-        data: { user: { id: 'mock-user', email: 'user@example.com' } },
-        error: null
-      }),
-      signUp: () => Promise.resolve({
-        data: { user: { id: 'mock-user', email: 'user@example.com' }, session: null },
-        error: null
-      }),
-      getSession: () => Promise.resolve({
-        data: { session: { access_token: 'mock-token' } },
-        error: null
-      }),
-      signOut: () => Promise.resolve({
-        error: null
-      }),
-      // Add mock for resetPasswordForEmail
-      resetPasswordForEmail: (email: string, options?: { redirectTo?: string }) => {
-        console.log(`Mock: Password reset initiated for ${email}, redirecting to ${options?.redirectTo}`);
-        // Simulate success in mock environment
-        return Promise.resolve({ data: {}, error: null }); 
+      
+      signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
+        console.log("MOCK: Sign in with password", { email });
+        
+        // Find user
+        const user = Object.values(mockData.users).find((u: any) => u.email === email);
+        if (!user) {
+          return { 
+            data: { user: null, session: null }, 
+            error: { message: "Invalid login credentials", status: 400 } 
+          };
+        }
+        
+        // Return success
+        return {
+          data: {
+            user,
+            session: {
+              access_token: `mock-token-${user.id}`,
+              refresh_token: `mock-refresh-${user.id}`,
+              expires_in: 3600,
+              expires_at: Math.floor(Date.now() / 1000) + 3600,
+              token_type: "bearer",
+              user
+            }
+          },
+          error: null
+        };
+      },
+      
+      signOut: async () => {
+        console.log("MOCK: Sign out");
+        return { error: null };
+      },
+      
+      getSession: async () => {
+        console.log("MOCK: Get session");
+        return { data: { session: null }, error: null };
+      },
+      
+      onAuthStateChange: (callback: any) => {
+        console.log("MOCK: Auth state change listener registered");
+        return { data: { subscription: { unsubscribe: () => {} } }, error: null };
+      },
+      
+      // Add other auth methods as needed
+      signInWithOAuth: async (params: any) => {
+        console.log("MOCK: Sign in with OAuth", params);
+        return { error: { message: "OAuth not supported in mock mode", status: 400 } };
       }
     },
-    // Add mock storage implementation
-    storage: {
-      // Store files in-memory
-      _files: new Map<string, { data: File; url: string }>(),
-      _buckets: new Set<string>(['user-documents', 'trip-documents']), // Default buckets
-      
-      // Method to list all buckets
-      listBuckets: () => {
-        // Convert Set to array of bucket objects
-        const buckets = Array.from(
-          // @ts-ignore - Private API
-          this.storage._buckets
-        ).map(name => ({ 
-          name, 
-          id: `mock-${name}`, 
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
-        
-        return Promise.resolve({
-          data: buckets,
-          error: null
-        });
-      },
-      
-      // Method to create a new bucket
-      createBucket: (name: string, options: { public: boolean }) => {
-        console.log(`[Mock Storage] Creating bucket: ${name}, public: ${options.public}`);
-        // @ts-ignore - Private API
-        this.storage._buckets.add(name);
-        
-        return Promise.resolve({
-          data: { name },
-          error: null
-        });
-      },
-      
-      from: (bucket: string) => {
-        return {
-          upload: (path: string, file: File, options?: any) => {
-            console.log(`[Mock Storage] Uploading ${file.name} to ${bucket}/${path}`);
-            // Create blob URL for local access
-            const url = URL.createObjectURL(file);
-            // Store file with its path as key
-            const key = `${bucket}/${path}`;
-            // @ts-ignore - Private API
-            this.storage._files.set(key, { data: file, url });
-            
-            return Promise.resolve({
-              data: { path },
-              error: null
-            });
+    from: (table: string) => ({
+      select: () => ({
+        eq: (field: string, value: any) => ({
+          single: async () => {
+            console.log(`MOCK: Select from ${table} where ${field} = ${value}`);
+            const items = mockData[table] || {};
+            const result = Object.values(items).find((item: any) => item[field] === value);
+            return { data: result || null, error: null };
           },
           
-          getPublicUrl: (path: string) => {
-            console.log(`[Mock Storage] Getting public URL for ${bucket}/${path}`);
-            const key = `${bucket}/${path}`;
-            // @ts-ignore - Private API
-            const fileEntry = this.storage._files.get(key);
+          // Add other query methods as needed
+          execute: async () => {
+            console.log(`MOCK: Select from ${table} where ${field} = ${value}`);
+            const items = mockData[table] || {};
+            const results = Object.values(items).filter((item: any) => item[field] === value);
+            return { data: results, error: null };
+          }
+        })
+      }),
+      
+      insert: (data: any) => ({
+        execute: async () => {
+          console.log(`MOCK: Insert into ${table}`, data);
+          const id = data.id || `mock-${table}-${Date.now()}`;
+          if (!mockData[table]) mockData[table] = {};
+          mockData[table][id] = { ...data, id };
+          saveData();
+          return { data: mockData[table][id], error: null };
+        }
+      }),
+      
+      update: (data: any) => ({
+        eq: (field: string, value: any) => ({
+          execute: async () => {
+            console.log(`MOCK: Update ${table} where ${field} = ${value}`, data);
+            const items = mockData[table] || {};
+            const updatedItems: any[] = [];
             
-            if (fileEntry) {
-              return {
-                data: {
-                  publicUrl: fileEntry.url
-                },
-                error: null
-              };
-            }
-            
-            // For development, just use a fake URL if file not found
-            return {
-              data: {
-                publicUrl: `mock://storage/${bucket}/${path}`
-              },
-              error: null
-            };
-          },
-          
-          remove: (paths: string[]) => {
-            console.log(`[Mock Storage] Removing paths: ${paths.join(', ')} from ${bucket}`);
-            
-            paths.forEach(path => {
-              const key = `${bucket}/${path}`;
-              // @ts-ignore - Private API
-              const fileEntry = this.storage._files.get(key);
-              
-              if (fileEntry) {
-                // Revoke blob URL to prevent memory leaks
-                URL.revokeObjectURL(fileEntry.url);
-                // @ts-ignore - Private API
-                this.storage._files.delete(key);
+            Object.keys(items).forEach(key => {
+              if (items[key][field] === value) {
+                items[key] = { ...items[key], ...data };
+                updatedItems.push(items[key]);
               }
             });
             
-            return Promise.resolve({
-              data: { count: paths.length },
-              error: null
-            });
+            saveData();
+            return { data: updatedItems, error: null };
           }
-        };
-      }
-    }
+        })
+      }),
+      
+      delete: () => ({
+        eq: (field: string, value: any) => ({
+          execute: async () => {
+            console.log(`MOCK: Delete from ${table} where ${field} = ${value}`);
+            const items = mockData[table] || {};
+            const deletedItems: any[] = [];
+            
+            Object.keys(items).forEach(key => {
+              if (items[key][field] === value) {
+                deletedItems.push(items[key]);
+                delete items[key];
+              }
+            });
+            
+            saveData();
+            return { data: deletedItems, error: null };
+          }
+        })
+      })
+    })
   };
 };
 
-/**
- * Get Supabase client - implements singleton pattern to prevent multiple instances
- */
-const getSupabaseClient = () => {
-  // Return existing instance if already created
-  if (supabaseInstance) {
-    return supabaseInstance;
-  }
-
-  // Check if we're in development mode or if Supabase URL/key are not available
-  const isDevelopment = import.meta.env.MODE === 'development';
-  const missingSupabaseConfig = !cleanedSupabaseUrl || !cleanedSupabaseAnonKey;
-
-  if (missingSupabaseConfig) {
-    console.error("🚫 CRITICAL ERROR: Missing Supabase configuration!");
-    console.error("Supabase URL:", cleanedSupabaseUrl ? "Provided" : "MISSING");
-    console.error("Supabase Key:", cleanedSupabaseAnonKey ? "Provided" : "MISSING");
-    console.error("This will cause visa requirements to not work correctly!");
-  }
-
-  // Create and cache the instance
-  if (missingSupabaseConfig) {
-    console.warn("[SupabaseClient] Using MOCK client because config is missing.");
-    supabaseInstance = createMockClient();
-  } else {
-    console.log("[SupabaseClient] Using REAL client with URL:", cleanedSupabaseUrl.substring(0, 25) + "...");
-    try {
-      supabaseInstance = createClient(cleanedSupabaseUrl, cleanedSupabaseAnonKey);
-    } catch (error) {
-      console.error("Failed to create Supabase client with provided credentials:", error);
-      console.warn("Falling back to mock client due to initialization error");
-      supabaseInstance = createMockClient();
-    }
-  }
-
-  return supabaseInstance;
-};
-
-// Export the singleton instance getter
-export const supabase = getSupabaseClient();
-
-// Test the connection on client creation (executed only once)
-(async () => {
-  try {
-    console.log("Testing Supabase connection...");
-    // Use a simple select query instead of count(*) to avoid PGRST100 error
-    const { data, error } = await supabase
-      .from('visa_requirements') // Use a table known to exist
-      .select('passport') // Use the correct lowercase column name
-      .limit(1);                 // Limit to 1 row for efficiency
-    
-    if (error) {
-      console.error('⚠️ Supabase connection test failed during initialization:', error);
-      console.warn('This may cause visa requirements functionality to not work correctly.');
-    } else {
-      console.log('✅ Supabase connection successful during initialization (checked passport column)');
-    }
-  } catch (err) {
-    console.error('⚠️ Supabase initialization error during connection test:', err);
-    console.warn('This may cause visa requirements functionality to not work correctly.');
-  }
-})();
-
+// Export the Supabase client
+const supabase = getSupabaseClient();
+export { supabase };
 export default supabase; 

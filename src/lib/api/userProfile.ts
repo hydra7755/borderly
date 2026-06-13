@@ -31,6 +31,11 @@ export interface UserProfile {
   }>;
   travel_history?: string[];
   saved_countries?: string[];
+  visa_free_countries?: number;
+  travel_history_count?: number;
+  app_metadata?: any;
+  user_metadata?: any;
+  aud?: string;
 }
 
 interface TravelHistory {
@@ -82,6 +87,43 @@ export const userProfileService = {
    */
   async getCurrentUserProfile(): Promise<{ profile: UserProfile | null; error: Error | null }> {
     try {
+      // For development mode, use mock implementation
+      if (import.meta.env.DEV) {
+        console.log("DEV MODE: Using mock user profile implementation");
+        
+        // Try to get user from localStorage first (from mock auth)
+        const storedUser = localStorage.getItem('travelscore_user');
+        
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          
+          // Create a mock profile based on the mock user
+          const mockProfile: UserProfile = {
+            id: user.id,
+            email: user.email,
+            full_name: user.full_name || 'Mock User',
+            nationality: user.nationality || 'US',
+            residency: user.residency || 'US',
+            created_at: user.created_at || new Date().toISOString(),
+            subscription_tier: user.subscription_tier || 'free',
+            travel_score: 85,
+            visa_free_countries: 120,
+            travel_history_count: 5,
+            app_metadata: user.app_metadata || {},
+            user_metadata: user.user_metadata || {},
+            aud: user.aud || 'authenticated'
+          };
+          
+          // Store in localStorage for persistence
+          localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(mockProfile));
+          
+          return { profile: mockProfile, error: null };
+        }
+        
+        // If no user in localStorage, return error
+        return { profile: null, error: new Error('No authenticated user') };
+      }
+      
       const { user, error: authError } = await authService.getCurrentUser();
       
       if (authError || !user) {
