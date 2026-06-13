@@ -1,10 +1,116 @@
 import supabase from '../supabase/client';
 import { VisaApplication } from '../../types/visa';
+import authService from './auth';
+import { getCountryNameFromCode } from './visaRequirements';
+
+export interface CreateVisaApplicationInput {
+  nationalityCode: string;
+  destinationCode: string;
+  purposeOfVisit?: string;
+  entryDate?: string;
+  exitDate?: string;
+  applicationData?: Record<string, unknown>;
+  paymentStatus?: 'pending' | 'paid';
+}
 
 /**
  * Service to handle visa application operations
  */
+function isMissingApplicationsTable(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const message = error.message?.toLowerCase() ?? '';
+  return (
+    error.code === 'PGRST205' ||
+    error.code === '42P01' ||
+    message.includes('visa_applications') ||
+    message.includes('does not exist') ||
+    message.includes('could not find the table')
+  );
+}
+
+function mapApplicationRow(row: Record<string, unknown>): VisaApplication {
+  const destinationCode = (row.destination_code as string) || (row.destination_id as string) || '';
+
+  return {
+    id: row.id as string,
+    user_id: row.user_id as string,
+    destination_id: destinationCode,
+    destination_code: destinationCode,
+    destination_name: row.destination_name as string | undefined,
+    nationality_code: row.nationality_code as string | undefined,
+    status: (row.status as VisaApplication['status']) || 'submitted',
+    application_date: (row.application_date as string) || (row.created_at as string),
+    documents_uploaded: Boolean(row.documents_uploaded),
+    payment_status: (row.payment_status as VisaApplication['payment_status']) || 'pending',
+    approval_date: row.approval_date as string | undefined,
+    visa_document_url: row.visa_document_url as string | undefined,
+    purpose_of_visit: row.purpose_of_visit as string | undefined,
+    entry_date: row.entry_date as string | undefined,
+    exit_date: row.exit_date as string | undefined,
+  };
+}
+
 const visaApplicationsService = {
+  async createApplication(
+    input: CreateVisaApplicationInput
+  ): Promise<{ application: VisaApplication | null; error: Error | null }> {
+    try {
+      const { user, error: authError } = await authService.getCurrentUser();
+      if (authError || !user) {
+        return { application: null, error: authError || new Error('Not authenticated') };
+      }
+
+      const destinationName = getCountryNameFromCode(input.destinationCode);
+
+      const { data, error } = await supabase
+        .from('visa_applications')
+        .insert({
+          user_id: user.id,
+          nationality_code: input.nationalityCode.toLowerCase(),
+          destination_code: input.destinationCode.toLowerCase(),
+          destination_name: destinationName,
+          purpose_of_visit: input.purposeOfVisit ?? null,
+          entry_date: input.entryDate ?? null,
+          exit_date: input.exitDate ?? null,
+          application_data: input.applicationData ?? null,
+          payment_status: input.paymentStatus ?? 'pending',
+          status: 'submitted',
+          documents_uploaded: Boolean(input.applicationData),
+        })
+        .select()
+        .single();
+
+      if (error || !data) {
+        return { application: null, error: error ?? new Error('Failed to create application') };
+      }
+
+      return { application: data as VisaApplication, error: null };
+    } catch (error) {
+      return { application: null, error: error as Error };
+    }
+  },
+
+  async markPaymentPaid(
+    applicationId: string,
+    transactionId?: string
+  ): Promise<{ success: boolean; error: Error | null }> {
+    try {
+      const { error } = await supabase
+        .from('visa_applications')
+        .update({
+          payment_status: 'paid',
+          status: 'processing',
+          transaction_id: transactionId ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', applicationId);
+
+      return { success: !error, error: error ?? null };
+    } catch (error) {
+      return { success: false, error: error as Error };
+    }
+  },
+
   /**
    * Get all visa applications for a specific user
    * @param userId - The user ID
@@ -19,14 +125,19 @@ const visaApplicationsService = {
         .from('visa_applications')
         .select('*')
         .eq('user_id', userId)
-        .order('application_date', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) {
+        if (isMissingApplicationsTable(error)) {
+          console.warn('visa_applications table not available yet — showing empty list');
+          return { applications: [], error: null };
+        }
         console.error('Error fetching visa applications:', error);
         return { applications: null, error };
       }
 
-      return { applications: data as VisaApplication[], error: null };
+      const applications = (data ?? []).map((row) => mapApplicationRow(row as Record<string, unknown>));
+      return { applications, error: null };
     } catch (error) {
       console.error('Unexpected error fetching visa applications:', error);
       return { applications: null, error: error as Error };

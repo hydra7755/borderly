@@ -4,6 +4,7 @@ import authService from '../lib/api/auth';
 import { useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash, FaApple } from 'react-icons/fa';
 import supabase from '../lib/supabase/client';
+import CountrySelect from '../components/CountrySelect';
 
 interface SignUpProps {
   onSignUp: (email: string, password: string, name: string) => void;
@@ -261,43 +262,27 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
                   />
                 </div>
                 
-                <div>
-                  <label htmlFor="nationality" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Nationality (Optional)
-                  </label>
-                  <input
-                    id="nationality"
-                    name="nationality"
-                    type="text"
-                    autoComplete="country"
-                    className="appearance-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10"
-                    placeholder="e.g. United States"
-                    value={nationality}
-                    onChange={(e) => setNationality(e.target.value)}
-                  />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    We use your nationality to provide visa requirement information
-                  </p>
-                </div>
-                
-                <div>
-                  <label htmlFor="residency" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Country of Residence (Optional)
-                  </label>
-                  <input
-                    id="residency"
-                    name="residency"
-                    type="text"
-                    autoComplete="country"
-                    className="appearance-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10"
-                    placeholder="e.g. United States"
-                    value={residency}
-                    onChange={(e) => setResidency(e.target.value)}
-                  />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Your current country of residence
-                  </p>
-                </div>
+                <CountrySelect
+                  id="nationality"
+                  label="Nationality (Optional)"
+                  value={nationality}
+                  onChange={setNationality}
+                  placeholder="Select your nationality"
+                />
+                <p className="-mt-4 mb-2 text-xs text-gray-500 dark:text-gray-400">
+                  We use your nationality to provide visa requirement information
+                </p>
+
+                <CountrySelect
+                  id="residency"
+                  label="Country of Residence (Optional)"
+                  value={residency}
+                  onChange={setResidency}
+                  placeholder="Select your country of residence"
+                />
+                <p className="-mt-4 mb-2 text-xs text-gray-500 dark:text-gray-400">
+                  Your current country of residence
+                </p>
                 
                 <div className="relative">
                   <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

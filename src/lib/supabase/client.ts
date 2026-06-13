@@ -12,36 +12,25 @@ let supabaseInstance: any = null;
 /**
  * Get Supabase client - implements singleton pattern to prevent multiple instances
  */
+const getEnvVar = (key: string, fallback: string = ''): string => {
+  const windowEnv = (window as any)?._env_?.[key];
+  if (windowEnv) return windowEnv;
+
+  const viteEnv = import.meta.env[key];
+  if (viteEnv) return viteEnv;
+
+  const altKey = key.replace('VITE_', 'REACT_APP_');
+  const altEnv = (window as any)?._env_?.[altKey];
+  if (altEnv) return altEnv;
+
+  return fallback;
+};
+
 const getSupabaseClient = () => {
   // Return existing instance if already created
   if (supabaseInstance) {
     return supabaseInstance;
   }
-
-  // For development, always use a mock client
-  if (import.meta.env.DEV) {
-    console.log("🔧 Development mode detected: Using mock Supabase client");
-    supabaseInstance = createMockClient();
-    return supabaseInstance;
-  }
-
-  // Get environment variables with multiple fallback sources
-  const getEnvVar = (key: string, fallback: string = ''): string => {
-    // Try Vite environment variables first
-    const viteEnv = import.meta.env[key];
-    if (viteEnv) return viteEnv;
-    
-    // Try window._env_ (loaded from env-config.js)
-    const windowEnv = (window as any)?._env_?.[key];
-    if (windowEnv) return windowEnv;
-    
-    // Try alternative key naming
-    const altKey = key.replace('VITE_', 'REACT_APP_');
-    const altEnv = (window as any)?._env_?.[altKey];
-    if (altEnv) return altEnv;
-    
-    return fallback;
-  };
 
   const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', '');
   const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', '');
@@ -208,8 +197,29 @@ const createMockClient = () => {
       },
       
       getSession: async () => {
-        console.log("MOCK: Get session");
+        const stored = localStorage.getItem('travelscore_session');
+        if (stored) {
+          try {
+            const session = JSON.parse(stored);
+            return { data: { session }, error: null };
+          } catch {
+            // fall through
+          }
+        }
         return { data: { session: null }, error: null };
+      },
+
+      getUser: async () => {
+        const stored = localStorage.getItem('travelscore_user');
+        if (stored) {
+          try {
+            const user = JSON.parse(stored);
+            return { data: { user }, error: null };
+          } catch {
+            // fall through
+          }
+        }
+        return { data: { user: null }, error: null };
       },
       
       onAuthStateChange: (callback: any) => {
@@ -223,77 +233,145 @@ const createMockClient = () => {
         return { error: { message: "OAuth not supported in mock mode", status: 400 } };
       }
     },
-    from: (table: string) => ({
-      select: () => ({
-        eq: (field: string, value: any) => ({
-          single: async () => {
-            console.log(`MOCK: Select from ${table} where ${field} = ${value}`);
-            const items = mockData[table] || {};
-            const result = Object.values(items).find((item: any) => item[field] === value);
-            return { data: result || null, error: null };
+    from: (table: string) => {
+      type Filter = { field: string; value: any };
+
+      const applyFilters = (items: any[], filters: Filter[]) =>
+        filters.reduce(
+          (rows, { field, value }) => rows.filter((item) => item[field] === value),
+          items
+        );
+
+      const buildSelectQuery = (filters: Filter[] = []) => {
+        const query: any = {
+          eq: (field: string, value: any) => buildSelectQuery([...filters, { field, value }]),
+          order: (field: string, options: { ascending?: boolean } = {}) => {
+            const ascending = options.ascending !== false;
+            const run = async () => {
+              const items = Object.values(mockData[table] || {});
+              const filtered = applyFilters(items, filters);
+              filtered.sort((a: any, b: any) => {
+                const av = a[field];
+                const bv = b[field];
+                if (av === bv) return 0;
+                return ascending ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+              });
+              return { data: filtered, error: null };
+            };
+            return { then: (resolve: any, reject?: any) => run().then(resolve, reject) };
           },
-          
-          // Add other query methods as needed
-          execute: async () => {
-            console.log(`MOCK: Select from ${table} where ${field} = ${value}`);
-            const items = mockData[table] || {};
-            const results = Object.values(items).filter((item: any) => item[field] === value);
-            return { data: results, error: null };
-          }
-        })
-      }),
-      
-      insert: (data: any) => ({
-        execute: async () => {
-          console.log(`MOCK: Insert into ${table}`, data);
-          const id = data.id || `mock-${table}-${Date.now()}`;
-          if (!mockData[table]) mockData[table] = {};
-          mockData[table][id] = { ...data, id };
+          single: async () => {
+            const items = Object.values(mockData[table] || {});
+            const filtered = applyFilters(items, filters);
+            return { data: filtered[0] ?? null, error: null };
+          },
+          maybeSingle: async () => {
+            const items = Object.values(mockData[table] || {});
+            const filtered = applyFilters(items, filters);
+            return { data: filtered[0] ?? null, error: null };
+          },
+          then: (resolve: any, reject?: any) => {
+            const items = Object.values(mockData[table] || {});
+            const filtered = applyFilters(items, filters);
+            return Promise.resolve({ data: filtered, error: null }).then(resolve, reject);
+          },
+        };
+        return query;
+      };
+
+      const buildMutationQuery = (
+        action: 'update' | 'delete',
+        payload?: any,
+        filters: Filter[] = []
+      ) => {
+        const run = async () => {
+          const items = mockData[table] || {};
+          const affected: any[] = [];
+
+          Object.keys(items).forEach((key) => {
+            const matches = filters.every(({ field, value }) => items[key][field] === value);
+            if (!matches) return;
+
+            if (action === 'update') {
+              items[key] = { ...items[key], ...payload };
+              affected.push(items[key]);
+            } else {
+              affected.push(items[key]);
+              delete items[key];
+            }
+          });
+
           saveData();
-          return { data: mockData[table][id], error: null };
-        }
-      }),
-      
-      update: (data: any) => ({
-        eq: (field: string, value: any) => ({
-          execute: async () => {
-            console.log(`MOCK: Update ${table} where ${field} = ${value}`, data);
-            const items = mockData[table] || {};
-            const updatedItems: any[] = [];
-            
-            Object.keys(items).forEach(key => {
-              if (items[key][field] === value) {
-                items[key] = { ...items[key], ...data };
-                updatedItems.push(items[key]);
-              }
+          return { data: affected, error: null };
+        };
+
+        return {
+          eq: (field: string, value: any) =>
+            buildMutationQuery(action, payload, [...filters, { field, value }]),
+          select: (_columns?: string) => ({
+            single: async () => {
+              const result = await run();
+              return { data: result.data[0] ?? null, error: null };
+            },
+            then: (resolve: any, reject?: any) => run().then(resolve, reject),
+          }),
+          then: (resolve: any, reject?: any) => run().then(resolve, reject),
+        };
+      };
+
+      return {
+        select: (_columns?: string) => buildSelectQuery(),
+        insert: (data: any) => {
+          let savedRows: any[] | null = null;
+
+          const performInsert = () => {
+            if (savedRows) return savedRows;
+            console.log(`MOCK: Insert into ${table}`, data);
+            const rows = Array.isArray(data) ? data : [data];
+            savedRows = rows.map((row) => {
+              const id = row.id || `mock-${table}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+              if (!mockData[table]) mockData[table] = {};
+              mockData[table][id] = {
+                ...row,
+                id,
+                created_at: row.created_at || new Date().toISOString(),
+              };
+              return mockData[table][id];
             });
-            
             saveData();
-            return { data: updatedItems, error: null };
-          }
-        })
-      }),
-      
-      delete: () => ({
-        eq: (field: string, value: any) => ({
-          execute: async () => {
-            console.log(`MOCK: Delete from ${table} where ${field} = ${value}`);
-            const items = mockData[table] || {};
-            const deletedItems: any[] = [];
-            
-            Object.keys(items).forEach(key => {
-              if (items[key][field] === value) {
-                deletedItems.push(items[key]);
-                delete items[key];
-              }
-            });
-            
-            saveData();
-            return { data: deletedItems, error: null };
-          }
-        })
-      })
-    })
+            return savedRows;
+          };
+
+          return {
+            select: (_columns?: string) => ({
+              single: async () => ({ data: performInsert()[0], error: null }),
+            }),
+            then: (resolve: any, reject?: any) =>
+              Promise.resolve({ data: performInsert()[0], error: null }).then(resolve, reject),
+          };
+        },
+        upsert: (data: any, _options?: any) => {
+          const rows = Array.isArray(data) ? data : [data];
+          const saved = rows.map((row) => {
+            const id = row.id;
+            if (!id) return row;
+            if (!mockData[table]) mockData[table] = {};
+            mockData[table][id] = { ...mockData[table][id], ...row };
+            return mockData[table][id];
+          });
+          saveData();
+          return {
+            select: (_columns?: string) => ({
+              single: async () => ({ data: saved[0] ?? null, error: null }),
+            }),
+            then: (resolve: any, reject?: any) =>
+              Promise.resolve({ data: saved, error: null }).then(resolve, reject),
+          };
+        },
+        update: (data: any) => buildMutationQuery('update', data),
+        delete: () => buildMutationQuery('delete'),
+      };
+    }
   };
 };
 

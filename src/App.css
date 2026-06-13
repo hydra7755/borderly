@@ -1,9 +1,5 @@
 /* Additional styling */
 
-html, body, #root {
-  height: 100%;
-}
-
 /* Reset some base styles */
 * {
   margin: 0;
@@ -11,8 +7,8 @@ html, body, #root {
   box-sizing: border-box;
 }
 
-/* Keep footer at the bottom */
-.min-h-screen {
+/* Keep footer at the bottom without overriding Tailwind min-h-screen globally */
+.page-shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;

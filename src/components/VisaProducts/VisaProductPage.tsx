@@ -85,15 +85,8 @@ const VisaProductPage: React.FC<VisaProductPageProps> = ({ product }) => {
   // State for traveler count
   const [travelerCount, setTravelerCount] = useState(1);
   
-  // Determine if we should show pricing (only for eVisa)
   const shouldShowPricing = () => {
-    // Check if it's Albania (which we know is an eVisa country)
-    if (product.countryCode === 'AL' || product.countryName === 'Albania') {
-      return true;
-    }
-    
-    // Only show pricing for eVisa
-    return visaRequirementForUser?.requirement === 'evisa' || product.visaType === 'evisa';
+    return ['evisa', 'eta'].includes(visaRequirementForUser?.requirement ?? '');
   };
 
   // User subscription status (mock - would come from user profile)
@@ -218,13 +211,20 @@ const VisaProductPage: React.FC<VisaProductPageProps> = ({ product }) => {
     };
   }, [fetchUserData]);
 
+  const nationalityFromSearch = () => new URLSearchParams(location.search).get('nationality') ?? '';
+
   const handleApplyClick = () => {
-    if (!userNationality) {
-      navigate('/login?redirect=' + encodeURIComponent(`/visa/${product.countryCode}`));
+    if (!visaRequirementForUser || !['evisa', 'eta'].includes(visaRequirementForUser.requirement)) {
       return;
     }
-    
-    navigate(`/visa/apply/${userNationality}/${product.countryCode}`);
+
+    const nationalityCode = userNationality || nationalityFromSearch();
+    if (!nationalityCode) {
+      navigate('/login?redirect=' + encodeURIComponent(`/visa/${product.countryCode}?nationality=${nationalityFromSearch()}`));
+      return;
+    }
+
+    navigate(`/visa/apply/${nationalityCode}/${product.countryCode}`);
   };
 
   // Toggle FAQ item open/closed state
@@ -239,13 +239,8 @@ const VisaProductPage: React.FC<VisaProductPageProps> = ({ product }) => {
   };
 
   const getButtonText = () => {
-    // If product is eVisa type, always show Apply for eVisa
-    if (product.visaType === 'evisa') {
-      return 'Apply for eVisa';
-    }
-    
-    if (!visaRequirementForUser) return 'Apply for Visa';
-    
+    if (!visaRequirementForUser) return 'Check Visa Options';
+
     switch (visaRequirementForUser.requirement) {
       case 'evisa':
         return 'Apply for eVisa';
@@ -256,21 +251,17 @@ const VisaProductPage: React.FC<VisaProductPageProps> = ({ product }) => {
       case 'visa-free':
         return 'No Visa Required';
       case 'visa-required':
-        return 'Apply for Visa';
+        return 'Contact Embassy';
       default:
         return 'Check Visa Options';
     }
   };
 
   const getButtonDisabled = () => {
-    // If product is eVisa type, always enable the button
-    if (product.visaType === 'evisa') {
-      return false;
-    }
-    
     if (!visaRequirementForUser) return false;
-    return visaRequirementForUser.requirement === 'visa-free' || 
-           visaRequirementForUser.requirement === 'not-applicable';
+    return ['visa-free', 'not-applicable', 'visa-required'].includes(
+      visaRequirementForUser.requirement
+    );
   };
 
   const convertCurrency = (amountInGBP: number): number => {

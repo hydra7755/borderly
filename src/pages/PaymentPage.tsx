@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -7,39 +7,44 @@ import {
   useStripe,
   useElements
 } from '@stripe/react-stripe-js';
+import visaApplicationsService from '../lib/api/visaApplications';
 
-// Initialize Stripe with your publishable key
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
-// Simple payment form component using Stripe Elements
-const SimplePaymentForm = () => {
+const SimplePaymentForm = ({ applicationId }: { applicationId?: string }) => {
   const stripe = useStripe();
   const elements = useElements();
+  const navigate = useNavigate();
   const [error, setError] = useState('');
   const [processing, setProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!stripe || !elements) {
+
+    if (!stripe || !elements || !applicationId) {
       return;
     }
-    
+
     setProcessing(true);
-    
+
     try {
-      // In a real application, you would create a payment intent on your server
-      // For testing, we're just showing the card element works
       const cardElement = elements.getElement(CardElement);
-      
       if (!cardElement) {
         throw new Error('Card element not found');
       }
-      
-      // Simulate successful payment
+
+      const { success: saved, error: saveError } = await visaApplicationsService.markPaymentPaid(
+        applicationId,
+        `txn_${Date.now()}`
+      );
+
+      if (!saved || saveError) {
+        throw saveError ?? new Error('Failed to record payment');
+      }
+
       setSuccess(true);
-      
+      setTimeout(() => navigate(`/visa/confirmation/${applicationId}`), 1500);
     } catch (err) {
       console.error('Payment error:', err);
       setError('An error occurred processing your payment');
@@ -100,7 +105,7 @@ const PaymentPage = () => {
       </p>
       
       <Elements stripe={stripePromise}>
-        <SimplePaymentForm />
+        <SimplePaymentForm applicationId={applicationId} />
       </Elements>
       </div>
   );

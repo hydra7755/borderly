@@ -1,821 +1,544 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ComposableMap,
   Geographies,
   Geography,
   ZoomableGroup,
   Sphere,
-  Graticule
+  Graticule,
 } from 'react-simple-maps';
 import { getCountryName, countryCodeMap } from '../../data/countryCodes';
-import { VisaRequirement, VisaRequirementType, RequirementColors, requirementToText } from '../../types/visa';
-import { supabase } from '../../lib/supabaseClient'; // Correct import path for Supabase client
+import { getFlagUrl } from '../../utils/countries';
+import {
+  buildPassportMobilityIndex,
+  getPassportMobilityStats,
+  normalizeCountryKey,
+  PassportMobilityStats,
+} from '../../services/visaCsvData';
 import './LoadingPlane.css';
 
 const geoUrl = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
-
-// Add initial map position constants
-const INITIAL_MAP_CENTER: [number, number] = [20, 10]; // Center more towards Europe/Africa
+const INITIAL_MAP_CENTER: [number, number] = [20, 10];
 const INITIAL_MAP_ZOOM = 1.5;
 
-// Get code from country name - Helper function since it's not exported from countryCodeMap
-const getCodeFromName = (name: string): string | undefined => {
-  const normalizedName = name.trim().toLowerCase();
-  for (const [code, countryName] of Object.entries(countryCodeMap)) {
-    if ((countryName as string).toLowerCase() === normalizedName) {
-      return code;
-    }
-  }
-  return undefined;
+/** Map TopoJSON country names to names used in our visa CSV. Keys are normalized via normalizeGeoKey(). */
+const GEO_NAME_ALIASES: Record<string, string> = {
+  'united states of america': 'United States',
+  'united states': 'United States',
+  'united kingdom': 'United Kingdom',
+  'dem rep congo': 'DR Congo',
+  'democratic republic of the congo': 'DR Congo',
+  'congo': 'Congo',
+  'republic of congo': 'Congo',
+  'cote d ivoire': 'Ivory Coast',
+  'ivory coast': 'Ivory Coast',
+  'eswatini': 'Swaziland',
+  'czechia': 'Czech Republic',
+  'bosnia and herz': 'Bosnia and Herzegovina',
+  'dominican rep': 'Dominican Republic',
+  'eq guinea': 'Equatorial Guinea',
+  'central african rep': 'Central African Republic',
+  's sudan': 'South Sudan',
+  'solomon is': 'Solomon Islands',
+  'saint vincent and the grenadines': 'Saint Vincent and the Grenadines',
+  'st vincent and the grenadines': 'Saint Vincent and the Grenadines',
+  'saint kitts and nevis': 'Saint Kitts and Nevis',
+  'st kitts and nevis': 'Saint Kitts and Nevis',
+  'antigua and barbuda': 'Antigua and Barbuda',
+  'antigua & barbuda': 'Antigua and Barbuda',
+  'sao tome and principe': 'Sao Tome and Principe',
+  'timor-leste': 'Timor-Leste',
+  'east timor': 'Timor-Leste',
+  'cabo verde': 'Cape Verde',
+  'cape verde': 'Cape Verde',
+  'macedonia': 'North Macedonia',
+  'north macedonia': 'North Macedonia',
+  'south korea': 'South Korea',
+  'north korea': 'North Korea',
+  'dem rep korea': 'North Korea',
+  'taiwan': 'Taiwan',
+  'hong kong': 'Hong Kong',
+  'macao': 'Macao',
+  'macau': 'Macao',
+  'palestine': 'Palestine',
+  'kosovo': 'Kosovo',
+  'vatican': 'Vatican',
+  'myanmar': 'Myanmar',
+  'burma': 'Myanmar',
+  'laos': 'Laos',
+  'syria': 'Syria',
+  'iran': 'Iran',
+  'vietnam': 'Vietnam',
+  'viet nam': 'Vietnam',
+  'tanzania': 'Tanzania',
+  'brunei': 'Brunei',
+  'greenland': 'Greenland',
+  'united arab emirates': 'United Arab Emirates',
+  'w sahara': 'Western Sahara',
+  'n cyprus': 'Cyprus',
+  'falkland is': 'Falkland Islands',
 };
 
-// Normalize various visa requirement strings into standard types
-const normalizeRequirementType = (requirement: string): VisaRequirementType => {
-  // Convert to lowercase and trim
-  const req = requirement.toLowerCase().trim();
-  
-  // Debug the incoming requirement string 
-  console.log(`[Normalize] Processing requirement: "${req}"`);
-  
-  // Handle visa-free variations
-  if (req === 'visa free' || req === 'visa-free' || req === 'visa_free' || req === 'visafree') {
-    return 'visa-free';
-  }
-  
-  // Handle e-visa variations (this is the most problematic one)
-  if (req === 'e-visa' || req === 'evisa' || req === 'e visa' || req === 'e_visa' || req === 'electronic visa') {
-    console.log('[Normalize] Converted to standard evisa format');
-    return 'evisa';
-  }
-  
-  // Handle visa-on-arrival variations
-  if (req === 'visa on arrival' || req === 'visa-on-arrival' || req === 'visa_on_arrival' || req === 'visaonarrival') {
-    return 'visa-on-arrival';
-  }
-  
-  // Handle visa-required variations
-  if (req === 'visa required' || req === 'visa-required' || req === 'visa_required' || req.includes('visa required')) {
-    return 'visa-required';
-  }
-  
-  // Handle no-admission variations
-  if (req === 'no admission' || req === 'no-admission' || req === 'not admitted' || req === 'no_admission' || req === 'noadmission') {
-    return 'no-admission';
-  }
-  
-  // If nothing matched, log a warning and return 'unknown'
-  console.warn(`[Normalize] Could not normalize visa requirement: "${requirement}"`);
-  return 'unknown';
-};
+interface GeoProperties {
+  name?: string;
+  NAME?: string;
+  iso_a2?: string;
+  ISO_A2?: string;
+}
 
-// Type assertion function to ensure country code is string
-const ensureString = (code: string | undefined): string => {
-  if (code === undefined) {
-    console.warn("[Warning] Undefined country code converted to empty string");
-    return "";
-  }
+/** world-atlas@2 uses lowercase `name`; older topojson used `NAME` + `ISO_A2`. */
+function getGeoCountryLabel(props: GeoProperties): string {
+  return (props.name || props.NAME || '').trim();
+}
+
+function getGeoIsoCode(props: GeoProperties): string | undefined {
+  const code = props.iso_a2 || props.ISO_A2;
+  if (!code || code === '-99') return undefined;
   return code;
-};
+}
+
+interface CountryRankData {
+  passport_rank?: string;
+  visa_free_countries?: string;
+}
 
 interface VisaRequirementsMapProps {
-  userNationality: string;
-  onCountrySelect: (countryCode: string, visaDetails: VisaRequirement) => void;
+  userNationality?: string;
+  onCountrySelect?: (countryCode: string, stats: PassportMobilityStats) => void;
 }
 
-interface RawVisaRequirement {
-  Passport: string;
-  Destination: string;
-  Requirement: string;
-}
-
-interface CountryDataItem {
-  name: string;
+interface HoveredCountry {
   code: string;
-  rank?: number;
-  [key: string]: string | number | undefined; // Allow for dynamic properties
-}
-
-interface TooltipData {
-  x: number;
-  y: number;
-  content: {
-    name: string;
-    visa: string;
-    rank?: number | string;
-  }
-}
-
-interface CountryDataRecord {
   name: string;
-  rank?: number | string;
-  code?: string;
+  stats: PassportMobilityStats | null;
+  rank: string | null;
 }
 
-// Loading animation component
-const LoadingPlane: React.FC = () => {
+const LoadingPlane: React.FC = () => (
+  <div className="loading-container">
+    <div className="loading-plane">
+      <svg
+        width="48"
+        height="48"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-teal-600"
+      >
+        <path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L10 12l-2 3H3l-1 1 3 2 2 3 1-1v-5l3-2 3.5 6.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
+      </svg>
+    </div>
+    <div className="loading-text">Loading world map...</div>
+  </div>
+);
+
+function normalizeGeoKey(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function resolveGeoCountryName(geoName: string, isoCode?: string): string {
+  if (isoCode && isoCode.length === 2) {
+    const fromCode = getCountryName(isoCode.toUpperCase());
+    if (fromCode && fromCode !== isoCode.toUpperCase()) return fromCode;
+  }
+
+  const normalized = normalizeGeoKey(geoName);
+  if (GEO_NAME_ALIASES[normalized]) return GEO_NAME_ALIASES[normalized];
+
+  const lower = geoName.trim().toLowerCase();
+  for (const [, name] of Object.entries(countryCodeMap)) {
+    if (name.toLowerCase() === lower) return name;
+  }
+
+  return geoName.trim();
+}
+
+function resolveCountryCode(geoName: string, isoCode?: string): string {
+  if (isoCode && isoCode.length === 2 && isoCode !== '-99') {
+    return isoCode.toUpperCase();
+  }
+
+  const resolvedName = resolveGeoCountryName(geoName, isoCode);
+  for (const [code, name] of Object.entries(countryCodeMap)) {
+    if (name.toLowerCase() === resolvedName.toLowerCase()) return code;
+  }
+  return '';
+}
+
+const StatRow: React.FC<{ label: string; value: number; color: string }> = ({
+  label,
+  value,
+  color,
+}) => (
+  <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+    <div className="flex items-center gap-2">
+      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+      <span className="text-sm text-gray-600">{label}</span>
+    </div>
+    <span className="text-sm font-semibold text-gray-900">{value}</span>
+  </div>
+);
+
+const PassportStatsCard: React.FC<{ country: HoveredCountry }> = ({ country }) => {
+  const { name, code, stats, rank } = country;
+
   return (
-    <div className="loading-container">
-      <div className="loading-plane">
-        <svg
-          width="48"
-          height="48"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="text-blue-600 dark:text-blue-400"
-        >
-          <path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L10 12l-2 3H3l-1 1 3 2 2 3 1-1v-5l3-2 3.5 6.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
-        </svg>
+    <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-5 w-full max-w-xs">
+      <div className="flex items-center gap-3 mb-4">
+        {code && (
+          <img
+            src={getFlagUrl(code.toLowerCase())}
+            alt=""
+            className="w-10 h-7 object-cover rounded shadow-sm"
+          />
+        )}
+        <div>
+          <h4 className="font-semibold text-gray-900 leading-tight">{name}</h4>
+          {rank && (
+            <p className="text-xs text-gray-500 mt-0.5">Passport rank #{rank}</p>
+          )}
+        </div>
       </div>
-      <div className="loading-text">
-        Loading your travel dashboard...
-      </div>
+
+      {stats ? (
+        <>
+          <p className="text-xs text-gray-500 mb-3">
+            Where {name} passport holders can travel
+          </p>
+          <StatRow label="Visa-free" value={stats.visaFree} color="#22c55e" />
+          <StatRow label="eVisa / ETA" value={stats.evisa} color="#14b8a6" />
+          <StatRow label="Traditional visa" value={stats.traditional} color="#ef4444" />
+          {stats.visaOnArrival > 0 && (
+            <StatRow label="Visa on arrival" value={stats.visaOnArrival} color="#f59e0b" />
+          )}
+          <p className="text-xs text-gray-400 mt-3">
+            {stats.totalDestinations} destinations tracked
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-gray-500">Passport data not available for this country.</p>
+      )}
     </div>
   );
 };
 
-const VisaRequirementsMap: React.FC<VisaRequirementsMapProps> = ({ userNationality, onCountrySelect }) => {
-  console.log(`[Render] SimpleWorldMap for ${userNationality}`);
-  const [zoom, setZoom] = useState<number>(1.2); // Initial zoom state
-  const [visaRequirements, setVisaRequirements] = useState<Record<string, VisaRequirement>>({});
-  const [countryRanks, setCountryRanks] = useState<Record<string, number | string>>({});
-  const [tooltipData, setTooltipData] = useState<{ x: number; y: number; content: { name: string; visa: string; rank: string | number } } | null>(null);
-  const [selectedRequirements, setSelectedRequirements] = useState<Set<VisaRequirementType>>(new Set());
+const VisaRequirementsMap: React.FC<VisaRequirementsMapProps> = ({
+  userNationality = '',
+  onCountrySelect,
+}) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [forceRender, setForceRender] = useState(0);
-  const [position, setPosition] = useState({ 
+  const [rankByCountryKey, setRankByCountryKey] = useState<Record<string, CountryRankData>>({});
+  const [activeCountry, setActiveCountry] = useState<HoveredCountry | null>(null);
+  const [isTouchMode, setIsTouchMode] = useState(false);
+  const statsPanelRef = React.useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({
     coordinates: INITIAL_MAP_CENTER,
-    zoom: INITIAL_MAP_ZOOM 
+    zoom: INITIAL_MAP_ZOOM,
   });
-  
-  // Get the full country name from the country code
-  const getCountryNameFromCode = useCallback((code: string): string => {
-    // Special case for Afghanistan - hardcode it to ensure correct lookup
-    if (code.toUpperCase() === 'AF') {
-      return 'Afghanistan';
-    }
-    
-    const country = Object.entries(countryCodeMap).find(([_, countryCode]) => countryCode === code);
-    return country ? country[0] : code;
-  }, []);
-  
-  // Get the country code from the full country name
-  const getCodeFromFullName = useCallback((fullName: string): string | undefined => {
-    // First check if it's already a country code (2 letters)
-    if (fullName.length === 2 && fullName === fullName.toUpperCase()) {
-      return fullName;
-    }
-    
-    // Special cases for commonly problematic countries
-    const specialCases: { [key: string]: string } = {
-      'afghanistan': 'AF',
-      'china': 'CN',
-      'syria': 'SY',
-      'turkey': 'TR'
-    };
-    
-    // Convert to lowercase for case-insensitive comparison
-    const normalizedName = fullName.trim().toLowerCase();
-    
-    // Check special cases first
-    if (specialCases[normalizedName]) {
-      return specialCases[normalizedName];
-    }
-    
-    // Check in countryCodeMap
-    for (const [code, name] of Object.entries(countryCodeMap)) {
-      if (name.toLowerCase() === normalizedName) {
-        return code;
-      }
-    }
-    
-    // Check in aliases
-    const visaNameAliases: { [key: string]: string } = {
-      'dr congo': 'CD',
-      'hong kong': 'HK',
-      'sao tome and principe': 'ST',
-      'micronesia': 'FM',
-      'macao': 'MO',
-      'congo': 'CG',
-      'swaziland': 'SZ',
-      'kosovo': 'XK',
-      'netherlands': 'NL',
-      'palestine': 'PS',
-      'vatican': 'VA',
-      'india': 'IN',
-      'united states of america': 'US',
-      'united states': 'US',
-      'greenland': 'GL',
-      'south korea': 'KR',
-      'north korea': 'KP',
-      'cape verde': 'CV',
-      'east timor': 'TL',
-      'timor-leste': 'TL',
-      'saint kitts and nevis': 'KN',
-      'saint vincent and the grenadines': 'VC',
-      'saint lucia': 'LC',
-      'united arab emirates': 'AE',
-      'papua new guinea': 'PG',
-      'south sudan': 'SS',
-      'angola': 'AO',
-      'kenya': 'KE',
-      'pakistan': 'PK',
-      'albania': 'AL',
-      'antigua and barbuda': 'AG',
-      'somalia': 'SO',
-      'ivory coast': 'CI',
-      'côte d\'ivoire': 'CI',
-      'malaysia': 'MY',
-      'iran': 'IR',
-      'tajikistan': 'TJ',
-      'libya': 'LY',
-      'egypt': 'EG',
-      'kazakhstan': 'KZ',
-    };
-    
-    return visaNameAliases[normalizedName];
-  }, []);
-  
-  // Load visa requirements data
-  useEffect(() => {
-    const loadData = async () => {
-      console.log('[Effect] Loading visa requirements data...');
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        // Get the user's passport country name
-        const userPassportName = getCountryName(userNationality) || userNationality;
-        console.log(`[Effect] Loading data for passport: ${userPassportName}`);
-        
-        // Direct query to get visa requirements from Supabase
-        const { data: visaData, error: visaError } = await supabase
-            .from('visa_requirements')
-            .select('*')
-          .eq('Passport', userPassportName)
-            .order('Destination');
-          
-        if (visaError) {
-          throw new Error(`Failed to fetch visa requirements: ${visaError.message}`);
-        }
-            
-        // Get country data with ranks
-        const { data: countryData, error: countryError } = await supabase
-            .from('country_data')
-            .select('*');
-            
-        if (countryError) {
-          throw new Error(`Failed to fetch country data: ${countryError.message}`);
-        }
 
-        // Process visa requirements
-        const processedVisaReqs: Record<string, VisaRequirement> = {};
-        const processedRanks: Record<string, number | string> = {};
+  const mobilityIndex = useMemo(() => buildPassportMobilityIndex(), []);
 
-        // First, create a map of country names to their ranks, codes, and other data
-        const countryInfoMap = new Map();
-        countryData.forEach((country: CountryDataRecord) => {
-          // Store by name
-          countryInfoMap.set(country.name, {
-            rank: country.rank || 'N/A',
-            code: country.code || ''
-          });
-          
-          // If country has a code, also store by code
-          if (country.code) {
-            countryInfoMap.set(country.code, {
-              rank: country.rank || 'N/A',
-              name: country.name
-            });
-          }
-        });
-        
-        // Process visa requirements using direct country names and store by both name and code
-        visaData.forEach((item: RawVisaRequirement) => {
-          if (item.Destination) {
-            const requirement = normalizeRequirementType(item.Requirement || 'unknown');
-            
-            // Get country info if available
-            const countryInfo = countryInfoMap.get(item.Destination);
-            
-            // Create the visa requirement
-            const visaReq = {
-              passport: userPassportName,
-              destination: item.Destination,
-              requirement: requirement
-            };
-            
-            // Store by destination name
-            processedVisaReqs[item.Destination] = visaReq;
-            processedRanks[item.Destination] = countryInfo?.rank?.toString() || 'N/A';
-            
-            // If we have a code for this country, also store by code
-            if (countryInfo?.code) {
-              processedVisaReqs[countryInfo.code] = visaReq;
-              processedRanks[countryInfo.code] = countryInfo.rank?.toString() || 'N/A';
-                    }
-                  }
-                });
-                
-        console.log(`[Effect] Processed ${Object.keys(processedVisaReqs).length} visa requirements`);
-        console.log(`[Effect] Processed ${Object.keys(processedRanks).length} country ranks`);
-
-        setVisaRequirements(processedVisaReqs);
-        setCountryRanks(processedRanks);
-        setIsLoading(false);
-        
-      } catch (err) {
-        console.error("[Effect] Error loading map data:", err);
-        setError(err instanceof Error ? err.message : "Failed to load map data");
-        setIsLoading(false);
-      }
-    };
-
-    if (userNationality) {
-      loadData();
-    } else {
-      setError("User nationality not provided");
-        setIsLoading(false);
-    }
+  const userCountryCode = useMemo(() => {
+    if (!userNationality) return '';
+    const trimmed = userNationality.trim();
+    if (trimmed.length === 2) return trimmed.toUpperCase();
+    const fromName = Object.entries(countryCodeMap).find(
+      ([, name]) => name.toLowerCase() === trimmed.toLowerCase()
+    )?.[0];
+    if (fromName) return fromName;
+    return resolveCountryCode(trimmed) || trimmed.toUpperCase();
   }, [userNationality]);
 
   useEffect(() => {
-    console.log("[Effect] Selected requirements changed:", Array.from(selectedRequirements));
-    // Use a setTimeout to ensure this runs after React has processed state updates
-    setTimeout(() => {
-      console.log("[Effect] Forcing re-render for requirements change");
-      setForceRender(prev => prev + 1);
-    }, 10); // Reduced timeout for faster response
-  }, [selectedRequirements]);
-  
-  // Zoom handlers
-  const handleZoomIn = useCallback(() => {
-    if (position.zoom >= 4) return;
-    setPosition(pos => ({
-      ...pos,
-      zoom: pos.zoom * 1.5
-    }));
-  }, [position.zoom]);
-  
-  const handleZoomOut = useCallback(() => {
-    if (position.zoom <= 1) return;
-    setPosition(pos => ({
-      ...pos,
-      zoom: pos.zoom / 1.5
-    }));
-  }, [position.zoom]);
-  
-  // Handle map movement
-  const handleMoveEnd = useCallback((position: any) => {
-    setPosition(position);
-  }, []);
-  
-  // This function is called when rendering the map to determine the fill color for each country
-  const getCountryFill = useCallback((geo: any): string => {
-    const countryName = geo.properties.NAME;
-    const countryCode = geo.properties.ISO_A2;
-    
-    if (!countryName && !countryCode) {
-      console.warn('[Fill] Country without name or code:', geo.properties);
-      return RequirementColors.default;
-    }
+    const touchQuery = window.matchMedia('(hover: none), (pointer: coarse)');
+    const mobileLayoutQuery = window.matchMedia('(max-width: 1023px)');
 
-    // Check if this is the user's own country
-    if (countryCode && countryCode === userNationality) {
-      return RequirementColors.own;
-    }
-    
-    // Try to find visa info by country name first, then by code
-    let visaInfo = countryName ? visaRequirements[countryName] : undefined;
-    if (!visaInfo && countryCode) {
-      visaInfo = visaRequirements[countryCode];
-    }
-    
-    if (!visaInfo || !visaInfo.requirement) {
-      return RequirementColors.default;
-    }
-    
-    const requirementType = visaInfo.requirement;
-    
-    if (!RequirementColors[requirementType]) {
-      console.error(`Unknown requirement type: ${requirementType} for country ${countryName || countryCode}`);
-      return RequirementColors.default;
-    }
-    
-    if (selectedRequirements.size === 0) {
-      return RequirementColors[requirementType];
-    }
-    
-    if (selectedRequirements.has(requirementType)) {
-      return RequirementColors[requirementType];
-    }
-    
-    return '#EEEEEE';
-  }, [userNationality, visaRequirements, selectedRequirements]);
-  
-  const handleMouseEnter = useCallback((geo: any, event: React.MouseEvent) => {
-    const countryName = geo.properties.NAME;
-    const countryCode = geo.properties.ISO_A2;
-    
-    if (!countryName && !countryCode) {
-      setTooltipData({
-        x: event.clientX + 10,
-        y: event.clientY + 10,
-        content: { name: 'Unknown', visa: 'Info unavailable', rank: 'N/A' }
-      });
-      return;
-    }
-    
-    // Try to find visa info by country name first, then by code
-    let visaInfo = countryName ? visaRequirements[countryName] : undefined;
-    if (!visaInfo && countryCode) {
-      visaInfo = visaRequirements[countryCode];
-    }
-    
-    let rankInfo = countryName ? countryRanks[countryName] : undefined;
-    if (rankInfo === undefined && countryCode) {
-      rankInfo = countryRanks[countryCode];
-    }
-    
-    const visaText = visaInfo ? requirementToText(visaInfo.requirement) : 'Info unavailable';
-    const rankText = rankInfo !== undefined && rankInfo !== null ? rankInfo : 'N/A';
-    
-    setTooltipData({
-      x: event.clientX + 10,
-      y: event.clientY + 10,
-      content: {
-        name: countryName || countryCode || 'Unknown Country',
-        visa: visaText,
-        rank: rankText
-      }
-    });
-  }, [visaRequirements, countryRanks]);
-  
+    const updateTouchMode = () => {
+      setIsTouchMode(touchQuery.matches || mobileLayoutQuery.matches);
+    };
+
+    updateTouchMode();
+    touchQuery.addEventListener('change', updateTouchMode);
+    mobileLayoutQuery.addEventListener('change', updateTouchMode);
+
+    return () => {
+      touchQuery.removeEventListener('change', updateTouchMode);
+      mobileLayoutQuery.removeEventListener('change', updateTouchMode);
+    };
+  }, []);
+
+  useEffect(() => {
+    fetch('/countrydata.json')
+      .then((res) => res.json())
+      .then((data: Array<{ country_name: string; passport_rank?: string; visa_free_countries?: string }>) => {
+        const map: Record<string, CountryRankData> = {};
+        for (const item of data) {
+          const key = normalizeCountryKey(
+            item.country_name.replace('&', 'and').replace('Antigua & Barbuda', 'Antigua and Barbuda')
+          );
+          map[key] = {
+            passport_rank: item.passport_rank,
+            visa_free_countries: item.visa_free_countries,
+          };
+          if (item.country_name.includes('Antigua')) {
+            map[normalizeCountryKey('Antigua and Barbuda')] = map[key];
+          }
+        }
+        setRankByCountryKey(map);
+      })
+      .catch(() => {
+        // Rank data is optional
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const lookupStats = useCallback(
+    (props: GeoProperties): { name: string; code: string; stats: PassportMobilityStats | null; rank: string | null } => {
+      const geoName = getGeoCountryLabel(props);
+      const isoCode = getGeoIsoCode(props);
+      const name = resolveGeoCountryName(geoName, isoCode);
+      const code = resolveCountryCode(geoName, isoCode);
+      const key = normalizeCountryKey(name);
+      const stats = mobilityIndex.get(key) ?? getPassportMobilityStats(name);
+      const rank = rankByCountryKey[key]?.passport_rank ?? null;
+
+      return { name: name || geoName, code, stats, rank };
+    },
+    [mobilityIndex, rankByCountryKey]
+  );
+
+  const handleMouseEnter = useCallback(
+    (geo: { properties: GeoProperties }) => {
+      if (isTouchMode) return;
+      setActiveCountry(lookupStats(geo.properties));
+    },
+    [lookupStats, isTouchMode]
+  );
+
   const handleMouseLeave = useCallback(() => {
-    setTooltipData(null);
-  }, []);
-  
-  const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    // No need to update state here, fixed positioning handles cursor following
-    // We keep the function for potential future use or complex logic
-  }, []);
+    if (isTouchMode) return;
+    setActiveCountry(null);
+  }, [isTouchMode]);
 
-  const handleCountryClick = (geo: any) => {
-    const countryName = geo.properties.NAME;
-    const countryCode = geo.properties.ISO_A2;
-    
-    if (!countryCode) {
-      console.warn('[Click] Country without code clicked:', countryName);
-      return;
-    }
-    
-    // Try to find visa info by country name first, then by code
-    let visaInfo = countryName ? visaRequirements[countryName] : undefined;
-    if (!visaInfo && countryCode) {
-      visaInfo = visaRequirements[countryCode];
-    }
-    
-    console.log(`[Click] Clicked on ${countryName} (${countryCode}), VisaInfo: ${visaInfo ? 'Exists' : 'None'}`);
-    
-    if (visaInfo && countryCode && countryCode !== userNationality) {
-      onCountrySelect(countryCode, visaInfo);
-    }
-  };
-  
-  // Handler for checkbox changes - improved to ensure consistent state updates
-  const handleRequirementToggle = useCallback((requirement: VisaRequirementType) => {
-    console.log(`[Checkbox] Toggling ${requirement}`);
-    
-    setSelectedRequirements(prevSelected => {
-      // Create a new Set from the previous selection to avoid mutation
-      const newSelected = new Set(prevSelected);
-      
-      // Toggle the requirement
-      if (newSelected.has(requirement)) {
-        console.log(`[Checkbox] Removing ${requirement}`);
-        newSelected.delete(requirement);
-      } else {
-        console.log(`[Checkbox] Adding ${requirement}`);
-        newSelected.add(requirement);
+  const handleCountryClick = useCallback(
+    (geo: { properties: GeoProperties }) => {
+      const info = lookupStats(geo.properties);
+
+      if (isTouchMode) {
+        setActiveCountry((prev) =>
+          prev?.code === info.code && info.code ? null : info
+        );
+        requestAnimationFrame(() => {
+          statsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+        return;
       }
-      
-      console.log("[Checkbox] New selected requirements:", Array.from(newSelected));
-      
-      // Debug: Count countries with this requirement 
-      const countriesWithRequirement = Object.entries(visaRequirements)
-        .filter(([_, info]) => info.requirement === requirement)
-        .map(([code, _]) => code);
-      
-      console.log(`[Debug] Countries with ${requirement} requirement (${countriesWithRequirement.length}):`, 
-        countriesWithRequirement.length > 0 ? 
-          countriesWithRequirement.slice(0, 10).map(code => `${code}: ${getCountryName(code) || code}`).join(', ') + 
-          (countriesWithRequirement.length > 10 ? ` and ${countriesWithRequirement.length - 10} more...` : '')
-        : 'None found');
-      
-      // Force immediate re-render to apply changes right away
-      setTimeout(() => {
-        console.log("[Checkbox] Forcing immediate re-render after change");
-        setForceRender(prev => prev + 1);
-      }, 0);
-      
-      return newSelected;
-    });
-  }, [visaRequirements]);
+
+      if (info.code && info.stats && onCountrySelect) {
+        onCountrySelect(info.code, info.stats);
+      }
+    },
+    [lookupStats, onCountrySelect, isTouchMode]
+  );
+
+  const getCountryFill = useCallback(
+    (geo: { properties: GeoProperties }) => {
+      const geoName = getGeoCountryLabel(geo.properties);
+      const isoCode = getGeoIsoCode(geo.properties);
+      const code = resolveCountryCode(geoName, isoCode);
+      const name = resolveGeoCountryName(geoName, isoCode);
+
+      const isActive =
+        (activeCountry?.code && code && activeCountry.code === code) ||
+        (activeCountry?.name && name && activeCountry.name === name);
+
+      if (isActive) return '#0d9488';
+
+      if (userCountryCode && code === userCountryCode) return '#64748b';
+
+      return '#e2e8f0';
+    },
+    [activeCountry, userCountryCode]
+  );
+
+  const handleZoomIn = () => {
+    if (position.zoom >= 4) return;
+    setPosition((pos) => ({ ...pos, zoom: pos.zoom * 1.5 }));
+  };
+
+  const handleZoomOut = () => {
+    if (position.zoom <= 1) return;
+    setPosition((pos) => ({ ...pos, zoom: pos.zoom / 1.5 }));
+  };
 
   if (isLoading) {
     return (
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden" style={{ minHeight: '500px' }}>
+      <div className="relative bg-white rounded-lg shadow-md overflow-hidden" style={{ minHeight: '520px' }}>
         <LoadingPlane />
       </div>
     );
   }
-  
-  if (error) {
-      return <div className="p-6 text-center text-red-600">Error loading map: {error}</div>;
-  }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden relative" style={{ minHeight: '500px' }} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
-      {tooltipData && (
-        <div 
-          style={{ 
-            position: 'fixed',
-            left: `${tooltipData.x}px`, // Offset slightly from cursor
-            top: `${tooltipData.y}px`, // Offset slightly from cursor
-            background: 'rgba(0, 0, 0, 0.75)',
-            color: 'white',
-            padding: '8px 12px',
-            borderRadius: '4px',
-            fontSize: '12px',
-            whiteSpace: 'nowrap',
-            zIndex: 1000, // Ensure tooltip is on top
-            pointerEvents: 'none' // Prevent tooltip from blocking mouse events
-          }}
-        >
-          <div><strong>{tooltipData.content.name}</strong></div>
-          <div>Visa: {tooltipData.content.visa}</div>
-          <div>Passport Rank: {tooltipData.content.rank}</div>
-        </div>
-      )}
-      
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Visa Requirements Map</h3>
-        <p className="text-gray-600 dark:text-gray-400 my-2">
-          Explore visa requirements for your {getCountryName(userNationality)} passport. (Hover for details)
+    <div className="bg-white rounded-lg shadow-md overflow-hidden relative" style={{ minHeight: '520px' }}>
+      <div className="p-4 sm:p-6 border-b border-gray-200">
+        <h3 className="text-xl font-semibold text-gray-900">Passport Power Map</h3>
+        <p className="text-gray-600 text-sm mt-1 hidden lg:block">
+          Hover over any country to see where its passport holders can travel — visa-free, eVisa, or traditional visa.
         </p>
-        
-        <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs mt-2 items-center">
-          <div className="mr-2 font-medium">Filter by visa type:</div>
-          
-          {/* Visa Free checkbox */}
-          <label className="flex items-center cursor-pointer mr-3">
-            <input
-              type="checkbox"
-              checked={selectedRequirements.has('visa-free')}
-              onChange={() => handleRequirementToggle('visa-free')}
-              className="mr-1.5 h-3 w-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-            />
-            <span 
-              className="w-3 h-3 rounded-sm mr-1.5 inline-block"
-              style={{ backgroundColor: RequirementColors['visa-free'] }}
-            ></span>
-            Visa Free
-          </label>
-          
-          {/* E-Visa checkbox */}
-          <label className="flex items-center cursor-pointer mr-3">
-            <input
-              type="checkbox"
-              checked={selectedRequirements.has('evisa')}
-              onChange={() => handleRequirementToggle('evisa')}
-              className="mr-1.5 h-3 w-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-            />
-            <span 
-              className="w-3 h-3 rounded-sm mr-1.5 inline-block"
-              style={{ backgroundColor: RequirementColors['evisa'] }}
-            ></span>
-            E-Visa
-          </label>
-          
-          {/* Visa on Arrival checkbox */}
-          <label className="flex items-center cursor-pointer mr-3">
-            <input
-              type="checkbox"
-              checked={selectedRequirements.has('visa-on-arrival')}
-              onChange={() => handleRequirementToggle('visa-on-arrival')}
-              className="mr-1.5 h-3 w-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-            />
-            <span 
-              className="w-3 h-3 rounded-sm mr-1.5 inline-block"
-              style={{ backgroundColor: RequirementColors['visa-on-arrival'] }}
-            ></span>
-            Visa on Arrival
-          </label>
-          
-          {/* Visa Required checkbox */}
-          <label className="flex items-center cursor-pointer mr-3">
-            <input
-              type="checkbox"
-              checked={selectedRequirements.has('visa-required')}
-              onChange={() => handleRequirementToggle('visa-required')}
-              className="mr-1.5 h-3 w-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-            />
-            <span 
-              className="w-3 h-3 rounded-sm mr-1.5 inline-block"
-              style={{ backgroundColor: RequirementColors['visa-required'] }}
-            ></span>
-            Visa Required
-          </label>
-          
-          {/* No Admission checkbox */}
-          <label className="flex items-center cursor-pointer mr-3">
-            <input
-              type="checkbox"
-              checked={selectedRequirements.has('no-admission')}
-              onChange={() => handleRequirementToggle('no-admission')}
-              className="mr-1.5 h-3 w-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-            />
-            <span 
-              className="w-3 h-3 rounded-sm mr-1.5 inline-block"
-              style={{ backgroundColor: RequirementColors['no-admission'] }}
-            ></span>
-            No Admission
-          </label>
-          
-          {selectedRequirements.size > 0 && (
+        <p className="text-gray-600 text-sm mt-1 lg:hidden">
+          Tap any country on the map to see where its passport holders can travel — visa-free, eVisa, or traditional visa.
+        </p>
+        {userCountryCode && (
+          <p className="text-xs text-gray-500 mt-2">
+            Your passport ({getCountryName(userCountryCode)}) is highlighted in gray.
+          </p>
+        )}
+      </div>
+
+      <div className="relative flex flex-col lg:flex-row">
+        {/* Map */}
+        <div className="flex-1 relative">
+          <div className="absolute top-4 right-4 z-10 flex flex-col gap-1">
             <button
-              onClick={() => {
-                console.log("[Clear] Clearing all filters");
-                setSelectedRequirements(new Set());
-                setTimeout(() => {
-                  console.log("[Clear] Forcing re-render after clear");
-                  setForceRender(prev => prev + 1);
-                }, 0);
-              }}
-              className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 ml-2"
+              type="button"
+              onClick={handleZoomIn}
+              className="bg-white text-gray-800 font-bold p-2 rounded shadow hover:bg-gray-50 text-base"
+              aria-label="Zoom in"
             >
-              Clear filters
+              +
             </button>
-          )}
-        </div>
-        
-        {/* Debug information - show counts of countries by visa type */}
-        <div className="mt-2 text-xs text-gray-500">
-          {Object.entries(RequirementColors)
-            .filter(([key]) => !['default', 'own'].includes(key))
-            .map(([reqType, color]) => {
-              const count = Object.values(visaRequirements).filter(
-                req => req.requirement === reqType
-              ).length;
-              
-              if (count > 0) {
-                return (
-                  <span key={reqType} className="mr-3">
-                    {reqType}: {count} countries
-                  </span>
-                );
-              }
-              return null;
-            })}
-        </div>
-      </div>
-
-      {/* Zoom Controls */}
-      <div className="absolute top-4 right-4 z-10 flex flex-col space-y-1">
-        <button 
-          onClick={handleZoomIn}
-          className="bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold p-2 rounded shadow hover:bg-gray-100 dark:hover:bg-gray-600 transition duration-150 ease-in-out text-base"
-          aria-label="Zoom in"
-        >
-          +
-        </button>
-        <button 
-          onClick={handleZoomOut}
-          className="bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold p-2 rounded shadow hover:bg-gray-100 dark:hover:bg-gray-600 transition duration-150 ease-in-out text-base"
-          aria-label="Zoom out"
-        >
-          -
-        </button>
-      </div>
-      
-      <div className="relative flex justify-center">
-        <div key={`map-container-${forceRender}`} className="w-full h-[450px] overflow-hidden flex justify-center">
-          <ComposableMap
-            projectionConfig={{
-              scale: 147,
-              center: INITIAL_MAP_CENTER // Use constant for consistency
-            }}
-            width={800}
-            height={450}
-            style={{
-              width: "100%",
-              height: "auto"
-            }}
-          >
-            <ZoomableGroup
-              zoom={position.zoom}
-              center={position.coordinates}
-              onMoveEnd={handleMoveEnd}
-              maxZoom={4}
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              className="bg-white text-gray-800 font-bold p-2 rounded shadow hover:bg-gray-50 text-base"
+              aria-label="Zoom out"
             >
-              <Sphere stroke="#E4E5E6" strokeWidth={0.5} />
-            <Graticule stroke="#E4E5E6" strokeWidth={0.5} />
-              {/* Re-render Geographies when forceRender changes */}
-              <Geographies key={`geographies-${forceRender}`} geography={geoUrl}>
-              {({ geographies }: { geographies: any[] }) => 
-                  geographies.map((geo: any) => {
-                  const countryCode = geo.properties.ISO_A2;
-                  const countryName = geo.properties.NAME;
-                  
-                  // Try to find visa info by country name first, then by code
-                  let visaInfo = countryName ? visaRequirements[countryName] : undefined;
-                  if (!visaInfo && countryCode) {
-                    visaInfo = visaRequirements[countryCode];
-                  }
-                  
-                  const isClickable = (countryCode || countryName) && visaInfo;
-                    const fill = getCountryFill(geo);
+              −
+            </button>
+          </div>
 
-                  return (
-                    <Geography
-                        key={`${geo.rsmKey}-${forceRender}`}
-                      geography={geo}
-                        fill={fill}
-                        stroke="#FFFFFF"
+          <div className="w-full h-[420px] lg:h-[480px] overflow-hidden flex justify-center bg-slate-50">
+            <ComposableMap
+              projectionConfig={{ scale: 147, center: INITIAL_MAP_CENTER }}
+              width={800}
+              height={450}
+              style={{ width: '100%', height: 'auto' }}
+            >
+              <ZoomableGroup
+                zoom={position.zoom}
+                center={position.coordinates}
+                onMoveEnd={setPosition}
+                maxZoom={4}
+              >
+                <Sphere stroke="#cbd5e1" strokeWidth={0.5} />
+                <Graticule stroke="#cbd5e1" strokeWidth={0.5} />
+                <Geographies geography={geoUrl}>
+                  {({ geographies }: { geographies: Array<{ rsmKey: string; properties: GeoProperties }> }) =>
+                    geographies.map((geo) => (
+                      <Geography
+                        key={geo.rsmKey}
+                        geography={geo}
+                        fill={getCountryFill(geo)}
+                        stroke="#ffffff"
                         strokeWidth={0.5}
-                      style={{
-                        default: { 
-                          outline: "none",
-                            transition: "all 0.3s ease-in-out"
-                        },
-                        hover: { 
-                          outline: "none",
-                            fill: "#006400", // Change to dark green for hover effect
-                          cursor: isClickable ? "pointer" : "default",
-                            transform: "translate(-0.5px, -0.5px) scale(1.01)", // Reduced from -2px, -2px and 1.03
-                          stroke: "#6B7280",
-                            strokeWidth: 0.8,
-                            filter: "drop-shadow(1px 1px 1px rgba(0,0,0,0.2))" // Reduced shadow as well
-                        },
-                        pressed: { 
-                          outline: "none",
-                            transform: "translate(0, 0) scale(1)"
-                          }
+                        style={{
+                          default: {
+                            outline: 'none',
+                            transition: 'all 0.25s ease-out',
+                          },
+                          hover: isTouchMode
+                            ? { outline: 'none', cursor: 'pointer' }
+                            : {
+                                outline: 'none',
+                                fill: '#0d9488',
+                                cursor: 'pointer',
+                                transform: 'translateY(-3px) scale(1.02)',
+                                filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.15))',
+                              },
+                          pressed: isTouchMode
+                            ? {
+                                outline: 'none',
+                                fill: '#0d9488',
+                                transform: 'translateY(-2px) scale(1.01)',
+                              }
+                            : { outline: 'none' },
                         }}
-                        onMouseEnter={(event: React.MouseEvent) => handleMouseEnter(geo, event)}
+                        onMouseEnter={() => handleMouseEnter(geo)}
                         onMouseLeave={handleMouseLeave}
                         onClick={() => handleCountryClick(geo)}
-                    />
-                  );
-                })
-              }
-            </Geographies>
-          </ZoomableGroup>
-        </ComposableMap>
+                      />
+                    ))
+                  }
+                </Geographies>
+              </ZoomableGroup>
+            </ComposableMap>
+          </div>
         </div>
+
+        {/* Stats card panel */}
+        <div
+          ref={statsPanelRef}
+          className="lg:w-72 xl:w-80 p-4 lg:p-6 flex items-start justify-center lg:border-l border-gray-200 bg-gray-50 min-h-[200px]"
+        >
+          {activeCountry ? (
+            <PassportStatsCard country={activeCountry} />
+          ) : (
+            <div className="text-center text-gray-400 text-sm py-8 px-4">
+              <svg
+                className="w-12 h-12 mx-auto mb-3 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="hidden lg:inline">Hover over a country to explore its passport mobility</span>
+              <span className="lg:hidden">Tap a country on the map to explore its passport mobility</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="px-4 sm:px-6 py-3 border-t border-gray-200 flex flex-wrap gap-4 text-xs text-gray-600">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-teal-600" />
+          <span className="hidden lg:inline">Hovered country</span>
+          <span className="lg:hidden">Selected country</span>
+        </span>
+        {userCountryCode && (
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-slate-500" /> Your country
+          </span>
+        )}
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-green-500" /> Visa-free
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-teal-500" /> eVisa / ETA
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-red-500" /> Traditional visa
+        </span>
       </div>
     </div>
   );
 };
 
-// Helper function to generate mock visa data for development
-const getMockVisaData = (): RawVisaRequirement[] => {
-  return [
-    // Add some test data for various passport
-    { Passport: "Angola", Destination: "United States", Requirement: "visa-required" },
-    { Passport: "Angola", Destination: "United Kingdom", Requirement: "visa-required" },
-    { Passport: "Angola", Destination: "France", Requirement: "visa-required" },
-    { Passport: "Angola", Destination: "Germany", Requirement: "visa-required" },
-    { Passport: "Angola", Destination: "Brazil", Requirement: "visa-free" },
-    { Passport: "Angola", Destination: "South Africa", Requirement: "visa-free" },
-    { Passport: "Angola", Destination: "China", Requirement: "visa-required" },
-    { Passport: "Angola", Destination: "Russia", Requirement: "visa-required" },
-    { Passport: "Angola", Destination: "India", Requirement: "evisa" }, // Use consistent 'evisa' type
-    { Passport: "Angola", Destination: "Turkey", Requirement: "evisa" }, // Use consistent 'evisa' type
-    { Passport: "Angola", Destination: "Thailand", Requirement: "visa-on-arrival" },
-    { Passport: "Angola", Destination: "Vietnam", Requirement: "visa-on-arrival" },
-    { Passport: "Angola", Destination: "North Korea", Requirement: "no-admission" },
-  ];
-};
-
-// Helper function to generate mock country data for development
-const getMockCountryData = (): any[] => {
-  return [
-    { name: 'Angola', code: 'AO' },
-    { name: 'Turkey', code: 'TR' },
-    { name: 'India', code: 'IN' },
-    { name: 'Thailand', code: 'TH' },
-    { name: 'France', code: 'FR' },
-    { name: 'Russia', code: 'RU' },
-    { name: 'North Korea', code: 'KP' },
-    { name: 'United States of America', code: 'US' },
-    { name: 'Greenland', code: 'GL' },
-    // Add more mock data as needed
-  ];
-};
-
-export default VisaRequirementsMap; 
+export default VisaRequirementsMap;

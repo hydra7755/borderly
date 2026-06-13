@@ -1,6 +1,47 @@
 import { supabase } from '../supabase/client';
 import { PostgrestError, PostgrestSingleResponse } from '@supabase/supabase-js';
 import authService from './auth';
+import { User } from '../../types/user';
+
+const LOCAL_STORAGE_PROFILE_KEY = 'travelscore_user_profile';
+
+async function syncProfileWithAuthUser(profile: UserProfile, user: User): Promise<UserProfile> {
+  const metaNationality = user.nationality || user.user_metadata?.nationality || '';
+  const metaResidency = user.residency || user.user_metadata?.residency || '';
+  const metaName = user.full_name || user.user_metadata?.full_name || '';
+
+  const updates: Partial<UserProfile> = {};
+
+  if (!profile.nationality && metaNationality) {
+    updates.nationality = metaNationality;
+  }
+  if (!profile.residency && metaResidency) {
+    updates.residency = metaResidency;
+  }
+  if ((!profile.full_name || profile.full_name === 'New User') && metaName) {
+    updates.full_name = metaName;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return profile;
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', profile.id)
+    .select()
+    .single();
+
+  if (!error && data) {
+    return { ...profile, ...data } as UserProfile;
+  }
+
+  return { ...profile, ...updates };
+}
 
 /**
  * Interface for user profile data
@@ -62,8 +103,6 @@ interface Document {
 }
 
 // Add a fallback mechanism using localStorage when Supabase fails
-const LOCAL_STORAGE_PROFILE_KEY = 'travelscore_user_profile';
-
 const createDefaultProfile = (): UserProfile => ({
   id: 'local-user',
   email: 'user@example.com',
@@ -77,6 +116,95 @@ const createDefaultProfile = (): UserProfile => ({
   questionnaire_completed: false
 });
 
+const getStoredProfile = (): UserProfile | null => {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const saveStoredProfile = (profile: UserProfile) => {
+  localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(profile));
+};
+
+const syncStoredUser = (profile: Partial<UserProfile>) => {
+  try {
+    const raw = localStorage.getItem('travelscore_user');
+    if (!raw) return;
+    const user = JSON.parse(raw);
+    localStorage.setItem('travelscore_user', JSON.stringify({
+      ...user,
+      full_name: profile.full_name ?? user.full_name,
+      nationality: profile.nationality ?? user.nationality,
+      residency: profile.residency ?? user.residency,
+      user_metadata: {
+        ...(user.user_metadata || {}),
+        full_name: profile.full_name ?? user.user_metadata?.full_name,
+        nationality: profile.nationality ?? user.user_metadata?.nationality,
+        residency: profile.residency ?? user.user_metadata?.residency,
+      },
+    }));
+  } catch {
+    // ignore storage errors
+  }
+};
+
+const pickText = (...values: (string | undefined | null)[]): string => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return '';
+};
+
+const mergeProfileData = (
+  user: User,
+  supabaseProfile: Partial<UserProfile> | null,
+  storedProfile: UserProfile | null
+): UserProfile => ({
+  id: user.id,
+  email: pickText(supabaseProfile?.email, storedProfile?.email, user.email),
+  full_name: pickText(
+    supabaseProfile?.full_name,
+    storedProfile?.full_name,
+    user.full_name,
+    user.user_metadata?.full_name,
+    'User'
+  ),
+  nationality: pickText(
+    supabaseProfile?.nationality,
+    storedProfile?.nationality,
+    user.nationality,
+    user.user_metadata?.nationality
+  ),
+  residency: pickText(
+    supabaseProfile?.residency,
+    storedProfile?.residency,
+    user.residency,
+    user.user_metadata?.residency
+  ),
+  travel_score: supabaseProfile?.travel_score ?? storedProfile?.travel_score ?? 0,
+  subscription_tier: (supabaseProfile?.subscription_tier ??
+    storedProfile?.subscription_tier ??
+    user.subscription_tier ??
+    'free') as UserProfile['subscription_tier'],
+  questionnaire_completed:
+    supabaseProfile?.questionnaire_completed ??
+    storedProfile?.questionnaire_completed ??
+    false,
+  phone_number: pickText(supabaseProfile?.phone_number, storedProfile?.phone_number),
+  passport_number: pickText(supabaseProfile?.passport_number, storedProfile?.passport_number),
+  passport_expiry: pickText(supabaseProfile?.passport_expiry, storedProfile?.passport_expiry),
+  travel_history: storedProfile?.travel_history ?? [],
+  saved_countries: storedProfile?.saved_countries ?? [],
+  saved_documents: storedProfile?.saved_documents ?? [],
+  created_at: supabaseProfile?.created_at ?? storedProfile?.created_at ?? user.created_at,
+  updated_at: supabaseProfile?.updated_at ?? storedProfile?.updated_at ?? new Date().toISOString(),
+});
+
 /**
  * User profile service for managing user profile data
  */
@@ -87,146 +215,105 @@ export const userProfileService = {
    */
   async getCurrentUserProfile(): Promise<{ profile: UserProfile | null; error: Error | null }> {
     try {
-      // For development mode, use mock implementation
-      if (import.meta.env.DEV) {
-        console.log("DEV MODE: Using mock user profile implementation");
-        
-        // Try to get user from localStorage first (from mock auth)
-        const storedUser = localStorage.getItem('travelscore_user');
-        
-        if (storedUser) {
-          const user = JSON.parse(storedUser);
-          
-          // Create a mock profile based on the mock user
-          const mockProfile: UserProfile = {
-            id: user.id,
-            email: user.email,
-            full_name: user.full_name || 'Mock User',
-            nationality: user.nationality || 'US',
-            residency: user.residency || 'US',
-            created_at: user.created_at || new Date().toISOString(),
-            subscription_tier: user.subscription_tier || 'free',
-            travel_score: 85,
-            visa_free_countries: 120,
-            travel_history_count: 5,
-            app_metadata: user.app_metadata || {},
-            user_metadata: user.user_metadata || {},
-            aud: user.aud || 'authenticated'
-          };
-          
-          // Store in localStorage for persistence
-          localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(mockProfile));
-          
-          return { profile: mockProfile, error: null };
-        }
-        
-        // If no user in localStorage, return error
-        return { profile: null, error: new Error('No authenticated user') };
-      }
-      
+      const storedProfile = getStoredProfile();
       const { user, error: authError } = await authService.getCurrentUser();
-      
-      if (authError || !user) {
-        console.log("Auth error or no user, falling back to localStorage (if available)");
-        const storedProfile = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
+
+      if (!user) {
         if (storedProfile) {
-          console.log("Returning profile from localStorage as fallback.");
-          return { profile: JSON.parse(storedProfile), error: null };
+          return { profile: storedProfile, error: null };
         }
-        // If no user and no local storage, return null without setting local storage
-        console.warn("No authenticated user and no profile in localStorage.");
         return { profile: null, error: authError || new Error('No authenticated user') };
       }
-      
-      // User is authenticated, proceed to fetch from Supabase
+
+      let supabaseProfile: Partial<UserProfile> | null = null;
+
       try {
-        console.log(`Fetching profile for user ID: ${user.id}`);
-        // Get base profile
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .maybeSingle(); // Use maybeSingle to handle 0 or 1 rows gracefully
-        
+          .maybeSingle();
+
         if (profileError) {
-          console.error('Error fetching profile data from Supabase:', profileError);
-          // Attempt local storage fallback on Supabase error
-          const storedProfile = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
-          if (storedProfile) {
-            console.warn("Supabase fetch failed, returning profile from localStorage.");
-            return { profile: JSON.parse(storedProfile), error: null }; // Return local data, but keep the original error context?
-          }
-          // If Supabase fails and no local data, return error
-          return { profile: null, error: profileError };
-        }
+          console.warn('Error fetching profile from Supabase:', profileError);
+        } else if (profile) {
+          supabaseProfile = profile as UserProfile;
+        } else {
+          const { data: createdProfile, error: createError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: user.id,
+              email: user.email,
+              full_name: user.full_name || user.user_metadata?.full_name || 'User',
+              nationality: user.nationality || user.user_metadata?.nationality || null,
+              residency: user.residency || user.user_metadata?.residency || null,
+            }, { onConflict: 'id' })
+            .select()
+            .single();
 
-        // Profile not found in Supabase for the authenticated user
-        if (!profile) {
-          console.warn(`Profile not found in Supabase for user ${user.id}. This might indicate a new user or missing profile record.`);
-          // Fallback to local storage if it exists
-          const storedProfile = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
-          if (storedProfile) {
-            console.warn("Profile not found in Supabase, returning profile from localStorage.");
-            return { profile: JSON.parse(storedProfile), error: null };
+          if (!createError && createdProfile) {
+            supabaseProfile = createdProfile as UserProfile;
           }
-          // If no profile in DB and no local storage, return null. Dashboard should handle this.
-          return { profile: null, error: new Error(`Profile not found for user ${user.id}`) }; // Return specific error
         }
+      } catch (fetchError) {
+        console.warn('Supabase profile fetch failed, using stored profile:', fetchError);
+      }
 
-        // Profile found, fetch related data
-        console.log("Profile found, fetching related data...");
-        // Get travel history
-        const { data: travelHistory } = await supabase
+      const mergedProfile = mergeProfileData(user, supabaseProfile, storedProfile);
+      const syncedProfile = await syncProfileWithAuthUser(mergedProfile, user);
+
+      let travelHistory: string[] = syncedProfile.travel_history ?? [];
+      let savedCountries: string[] = syncedProfile.saved_countries ?? [];
+      let savedDocuments = syncedProfile.saved_documents ?? [];
+
+      try {
+        const { data: travelHistoryRows } = await supabase
           .from('travel_history')
           .select('country_code')
           .eq('user_id', user.id);
 
-        // Get saved countries
-        const { data: savedCountries } = await supabase
+        const { data: savedCountryRows } = await supabase
           .from('saved_countries')
           .select('country_code')
           .eq('user_id', user.id);
 
-        // Get documents
         const { data: documents } = await supabase
-          .from('documents') // Assuming a 'documents' table exists for user docs
+          .from('documents')
           .select('*')
           .eq('user_id', user.id);
 
-        const fullProfile = {
-          ...profile,
-          // Safely map related data, defaulting to empty arrays if null/undefined
-          travel_history: travelHistory?.map((th: { country_code: string }) => th.country_code) ?? [],
-          saved_countries: savedCountries?.map((sc: { country_code: string }) => sc.country_code) ?? [],
-          saved_documents: documents ?? []
-        };
-
-        // Update localStorage as backup with the latest fetched data
-        localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(fullProfile));
-        console.log("Profile and related data loaded successfully from Supabase.");
-        return { profile: fullProfile as UserProfile, error: null };
-
-      } catch (fetchError) {
-        // Catch errors during the fetch process (after auth check)
-        console.error('Error during Supabase profile fetch process:', fetchError);
-        // Attempt local storage fallback on any fetch error
-        const storedProfile = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
-        if (storedProfile) {
-          console.warn("Supabase fetch process failed, returning profile from localStorage.");
-          return { profile: JSON.parse(storedProfile), error: null };
+        if (travelHistoryRows?.length) {
+          travelHistory = travelHistoryRows.map((row: { country_code: string }) => row.country_code);
         }
-        return { profile: null, error: fetchError as Error };
+        if (savedCountryRows?.length) {
+          savedCountries = savedCountryRows.map((row: { country_code: string }) => row.country_code);
+        }
+        if (documents?.length) {
+          savedDocuments = documents;
+        }
+      } catch (relatedError) {
+        console.warn('Could not load related profile data:', relatedError);
       }
-    } catch (initialAuthError) {
-      // Catch errors during the initial authService.getCurrentUser call
-      console.error('Initial authentication check failed:', initialAuthError);
-      // Attempt local storage fallback
-       const storedProfile = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
-        if (storedProfile) {
-          console.warn("Initial auth failed, returning profile from localStorage.");
-          return { profile: JSON.parse(storedProfile), error: null };
-        }
-      return { profile: null, error: initialAuthError as Error };
+
+      const fullProfile: UserProfile = {
+        ...syncedProfile,
+        nationality: syncedProfile.nationality ?? '',
+        residency: syncedProfile.residency ?? '',
+        travel_history: travelHistory,
+        saved_countries: savedCountries,
+        saved_documents: savedDocuments,
+      };
+
+      saveStoredProfile(fullProfile);
+      syncStoredUser(fullProfile);
+
+      return { profile: fullProfile, error: null };
+    } catch (error) {
+      const storedProfile = getStoredProfile();
+      if (storedProfile) {
+        return { profile: storedProfile, error: null };
+      }
+      return { profile: null, error: error as Error };
     }
   },
   
@@ -237,62 +324,80 @@ export const userProfileService = {
    */
   async updateProfile(profileData: Partial<UserProfile>): Promise<{ profile: UserProfile | null; error: Error | null }> {
     try {
-      console.log("Attempting to update user profile with data:", profileData);
-      
-      const { user, error: authError } = await authService.getCurrentUser();
-      
-      if (authError || !user) {
-        console.warn("No authenticated user found for profile update. Falling back to localStorage.");
-        // Fallback to localStorage
-        const storedProfile = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
-        // Use default profile if nothing in local storage
-        const currentProfile = storedProfile ? JSON.parse(storedProfile) : createDefaultProfile(); 
-        
+      const storedProfile = getStoredProfile();
+      const { user } = await authService.getCurrentUser();
+      const userId = user?.id || storedProfile?.id;
+
+      if (!userId) {
         const updatedProfile = {
-          ...currentProfile,
+          ...createDefaultProfile(),
           ...profileData,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         };
-        
-        localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(updatedProfile));
-        console.log("Updated profile saved to localStorage (fallback):", updatedProfile);
-        // Return the updated local profile, signal no Supabase error
-        return { profile: updatedProfile, error: null }; 
+        saveStoredProfile(updatedProfile);
+        return { profile: updatedProfile, error: null };
       }
-      
-      // User authenticated, attempt Supabase update
+
+      const currentProfile = storedProfile ?? (user
+        ? mergeProfileData(user, null, null)
+        : createDefaultProfile());
+
+      const updatedProfile: UserProfile = {
+        ...currentProfile,
+        ...profileData,
+        id: userId,
+        email: user?.email || currentProfile.email,
+        updated_at: new Date().toISOString(),
+      };
+
       try {
-        console.log(`Updating profile for user ID: ${user.id} in Supabase.`);
         const { data, error } = await supabase
           .from('profiles')
-          .update({
-            ...profileData,
-            updated_at: new Date().toISOString() // Ensure updated_at is set
-          })
-          .eq('id', user.id)
-          .select() // Select the updated row
-          .single(); // Expect a single row back
-        
-        if (error) {
-            console.error('Supabase profile update error:', error);
-            // Don't automatically fall back here, return the error to the caller
-            return { profile: null, error };
-        }
-        
-        console.log("Profile updated successfully in Supabase:", data);
-        // Also update localStorage as backup with the successful update
-        localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(data));
-        
-        return { profile: data as UserProfile, error: null };
+          .upsert({
+            id: userId,
+            email: updatedProfile.email,
+            full_name: updatedProfile.full_name,
+            nationality: updatedProfile.nationality || null,
+            residency: updatedProfile.residency || null,
+            phone_number: updatedProfile.phone_number || null,
+            passport_number: updatedProfile.passport_number || null,
+            passport_expiry: updatedProfile.passport_expiry || null,
+            updated_at: updatedProfile.updated_at,
+          }, { onConflict: 'id' })
+          .select()
+          .single();
 
+        if (!error && data) {
+          updatedProfile.nationality = data.nationality ?? updatedProfile.nationality ?? '';
+          updatedProfile.residency = data.residency ?? updatedProfile.residency ?? '';
+          updatedProfile.full_name = data.full_name ?? updatedProfile.full_name;
+        } else if (error) {
+          console.warn('Supabase profile upsert failed, saving locally:', error);
+        }
       } catch (supabaseError) {
-        console.error('Unexpected error during Supabase profile update:', supabaseError);
-        // Return the caught error
-        return { profile: null, error: supabaseError as Error };
+        console.warn('Supabase profile upsert threw, saving locally:', supabaseError);
       }
 
+      if (user) {
+        const authMetadata: Record<string, string> = {};
+        if (profileData.full_name) authMetadata.full_name = profileData.full_name;
+        if (profileData.nationality !== undefined) authMetadata.nationality = profileData.nationality || '';
+        if (profileData.residency !== undefined) authMetadata.residency = profileData.residency || '';
+
+        if (Object.keys(authMetadata).length > 0) {
+          try {
+            await supabase.auth.updateUser({ data: authMetadata });
+          } catch (authUpdateError) {
+            console.warn('Could not sync auth metadata:', authUpdateError);
+          }
+        }
+      }
+
+      saveStoredProfile(updatedProfile);
+      syncStoredUser(updatedProfile);
+
+      return { profile: updatedProfile, error: null };
     } catch (error) {
-      // Catch errors from the initial auth check or other unexpected issues
       console.error('Unexpected error during profile update process:', error);
       return { profile: null, error: error as Error };
     }

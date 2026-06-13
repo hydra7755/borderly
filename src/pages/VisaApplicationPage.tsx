@@ -1,15 +1,38 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import VisaApplicationStepper from '../components/EVisa/VisaApplicationStepper';
+import visaApplicationsService from '../lib/api/visaApplications';
 
 const VisaApplicationPage: React.FC = () => {
   const navigate = useNavigate();
+  const { nationality, destination } = useParams<{ nationality: string; destination: string }>();
 
-  const handleApplicationComplete = (data: any) => {
-    // Handle the completed application data
-    console.log('Application completed:', data);
-    // Navigate to success page or show confirmation
-    navigate('/visa/application/success');
+  const handleApplicationComplete = async (data: {
+    travelers?: unknown[];
+    travelDates?: { arrival?: string; departure?: string };
+    accommodation?: Record<string, unknown>;
+  }) => {
+    if (!nationality || !destination) {
+      navigate('/dashboard');
+      return;
+    }
+
+    const { application, error } = await visaApplicationsService.createApplication({
+      nationalityCode: nationality,
+      destinationCode: destination,
+      entryDate: data.travelDates?.arrival,
+      exitDate: data.travelDates?.departure,
+      applicationData: data as Record<string, unknown>,
+      paymentStatus: 'pending',
+    });
+
+    if (error || !application) {
+      console.error('Failed to save visa application:', error);
+      alert('Your application could not be saved. Please try again.');
+      return;
+    }
+
+    navigate(`/payment/${application.id}`);
   };
 
   return (

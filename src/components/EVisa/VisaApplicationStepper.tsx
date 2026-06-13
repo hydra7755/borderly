@@ -8,7 +8,7 @@ import authService from '../../lib/api/auth';
 import { userProfileService } from '../../lib/api/userProfile';
 
 interface VisaApplicationStepperProps {
-  onComplete?: (travelers: Traveler[]) => void;
+  onComplete?: (data: FormData) => void;
 }
 
 interface PassportData {
@@ -1381,10 +1381,8 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
 
   // Fix onComplete function call if needed
   const handleComplete = () => {
-    // Ensure we use the state variable travelers which is inside formData
-    if (onComplete && formData.travelers) {
-      // Pass the travelers array from the formData state
-      onComplete(formData.travelers); 
+    if (onComplete) {
+      onComplete(formData);
     }
   };
 
@@ -1465,8 +1463,8 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
   return (
     <div className="max-w-7xl mx-auto px-4">
       {/* Flow Steps Indicator */}
-      <div className="mb-12 relative">
-        <div className="flex justify-between items-center max-w-4xl mx-auto">
+      <div className="mb-8 lg:mb-12 relative overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex justify-between items-center min-w-[36rem] max-w-4xl mx-auto">
           {steps.map((step, index) => (
             <React.Fragment key={step.id}>
               <div className="flex flex-col items-center">
@@ -1489,7 +1487,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
                     />
                   )}
                 </motion.div>
-                <span className="text-sm font-medium mt-2 text-gray-600">{step.title}</span>
+                <span className="text-xs sm:text-sm font-medium mt-2 text-gray-600 text-center">{step.title}</span>
               </div>
               {index < steps.length - 1 && (
                 <div className="flex-1 h-0.5 bg-gray-200 relative mx-4">
@@ -1518,10 +1516,10 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
         </div>
       </div>
 
-      {/* Main grid layout - Adjust columns for better layout */}
-      <div className="grid grid-cols-4 gap-6">
-        {/* Left Column - 1 column */}
-        <div className="flex flex-col space-y-6">
+      {/* Main grid layout - responsive: stack on mobile, 4 columns on large screens */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
+        {/* Left Column - requirements & samples */}
+        <div className="flex flex-col space-y-4 lg:space-y-6 order-2 lg:order-1">
           {(currentStep === 1 || (processingTraveler && travelerStep === 1)) && (
             <>
               {/* Photo Requirements Card */}
@@ -1616,8 +1614,8 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
           {/* No helper cards for other steps */}
         </div>
 
-        {/* Middle Column - 2 columns - fix width to match original dimensions */}
-        <div className="flex flex-col col-span-2">
+        {/* Middle Column - main form */}
+        <div className="flex flex-col col-span-1 lg:col-span-2 order-1 lg:order-2">
           <div className="bg-white rounded-xl shadow-lg p-5 h-full">
             <AnimatePresence mode="wait">
               {/* If processing a traveler, show special title */}
@@ -1645,7 +1643,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
                   
                   {/* Camera Interface - preserve original dimensions */}
                   <div className="flex-1 flex flex-col items-center justify-center">
-                    <div className="w-64 h-64 rounded-full bg-gray-900 overflow-hidden relative mx-auto" id="camera-container">
+                    <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-full bg-gray-900 overflow-hidden relative mx-auto" id="camera-container">
                       {/* Always render the video element, but only show when active */}
                       <video
                         ref={videoRef}
@@ -2470,8 +2468,8 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
           </div>
         </div>
 
-        {/* Right Column - 1 column */}
-        <div className="bg-white rounded-xl shadow-lg p-5 h-fit">
+        {/* Right Column - step list (desktop only; mobile uses top progress bar) */}
+        <div className="hidden lg:block bg-white rounded-xl shadow-lg p-5 h-fit order-3">
           <div className="space-y-3">
             {steps.map((step) => (
               <div 

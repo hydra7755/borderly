@@ -28,6 +28,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
+.netlify
 travelscore.zip
 
 # Google Cloud credentials

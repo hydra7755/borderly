@@ -9,14 +9,16 @@ export interface VisaRequirement {
 export interface VisaApplication {
   id: string;
   user_id: string;
-  destination_id: string;
-  destination_name?: string; // Added for display purposes
-  status: 'pending' | 'submitted' | 'in_review' | 'approved' | 'rejected';
+  destination_id?: string;
+  destination_code?: string;
+  destination_name?: string;
+  nationality_code?: string;
+  status: 'pending' | 'submitted' | 'in_review' | 'approved' | 'rejected' | 'processing';
   application_date: string;
   documents_uploaded: boolean;
   payment_status: 'pending' | 'paid' | 'refunded';
   approval_date?: string;
-  visa_document_url?: string; // URL to download the approved visa document
+  visa_document_url?: string;
   purpose_of_visit?: string;
   entry_date?: string;
   exit_date?: string;

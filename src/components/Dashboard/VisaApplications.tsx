@@ -27,6 +27,8 @@ const VisaApplications: React.FC<VisaApplicationsProps> = ({
         return 'bg-blue-100 text-blue-800';
       case 'in_review':
         return 'bg-amber-100 text-amber-800';
+      case 'processing':
+        return 'bg-purple-100 text-purple-800';
       case 'approved':
         return 'bg-green-100 text-green-800';
       case 'rejected':
@@ -42,6 +44,8 @@ const VisaApplications: React.FC<VisaApplicationsProps> = ({
         return 'Application Submitted';
       case 'in_review':
         return 'Application In Review';
+      case 'processing':
+        return 'Processing';
       case 'approved':
         return 'Visa Approved';
       case 'rejected':
@@ -118,10 +122,15 @@ const VisaApplications: React.FC<VisaApplicationsProps> = ({
 
   if (applications.length === 0) {
     return (
-      <div className="p-6 bg-white rounded-lg shadow text-center">
-        <p className="text-gray-600">No visa applications found.</p>
-        <p className="text-gray-500 mt-2">
-          Applications you submit through our website will appear here.
+      <div className="py-10 px-6 bg-gray-50 rounded-lg border border-dashed border-gray-200 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-teal-50 text-teal-600">
+          <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <p className="text-gray-800 font-medium">You have not submitted any applications yet.</p>
+        <p className="text-gray-500 mt-2 text-sm max-w-md mx-auto">
+          When you apply for an eVisa through Borderly, your applications will appear here with status updates.
         </p>
       </div>
     );
@@ -141,7 +150,8 @@ const VisaApplications: React.FC<VisaApplicationsProps> = ({
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {application.destination_name || getCountryName(application.destination_id)}
+                  {application.destination_name ||
+                    getCountryName(application.destination_code || application.destination_id || '')}
                 </h3>
                 <p className="text-sm text-gray-500">
                   Application ID: {application.id}
@@ -163,6 +173,11 @@ const VisaApplications: React.FC<VisaApplicationsProps> = ({
               <div className="flex flex-col items-end">
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(application.status)}`}>
                   {getStatusText(application.status)}
+                </span>
+                <span className={`mt-2 px-2 py-0.5 rounded text-xs ${
+                  application.payment_status === 'paid' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  Payment: {application.payment_status === 'paid' ? 'Paid' : 'Pending'}
                 </span>
                 {application.approval_date && (
                   <p className="text-xs text-gray-500 mt-1">

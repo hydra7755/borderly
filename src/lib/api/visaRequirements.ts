@@ -49,25 +49,13 @@ export const getVisaRequirement = async (
       return getDefaultVisaRequirement(nationality, destination);
     }
 
-    // For Albania, we'll use a hardcoded response for now due to database issues
-    if (destinationCode === 'AL') {
-      return {
-        nationality: getCountryNameFromCode(nationalityCode),
-        destination: 'Albania',
-        requirement: 'evisa',
-        stay_duration: 90,
-        notes: 'Albania offers eVisa for most nationalities. Processing typically takes 3-5 business days.'
-      };
-    }
-    
-    // Try to get from the database - using a try/catch here to handle potential column errors
     try {
       const { data, error } = await supabase
         .from('visa_requirements')
         .select('*')
-        .eq('nationality', nationalityCode)
-        .eq('destination', destinationCode)
-        .single();
+        .eq('nationality', nationalityCode.toLowerCase())
+        .eq('destination', destinationCode.toLowerCase())
+        .maybeSingle();
         
       if (!error && data) {
         return {

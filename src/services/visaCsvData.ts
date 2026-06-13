@@ -186,3 +186,111 @@ export function getVisaRequirementsForNationalityFromCsv(nationality: string): V
     })
     .filter((item): item is VisaRequirement => item !== null);
 }
+
+export interface PassportMobilityStats {
+  countryName: string;
+  visaFree: number;
+  evisa: number;
+  traditional: number;
+  visaOnArrival: number;
+  totalDestinations: number;
+}
+
+type MobilityBucket = 'visaFree' | 'evisa' | 'traditional' | 'visaOnArrival' | 'domestic' | 'unknown';
+
+function classifyCellForMobility(rawValue: string): MobilityBucket {
+  const value = rawValue.trim().toLowerCase();
+
+  if (!value || value === '-1') return 'domestic';
+
+  if (/^\d+$/.test(value)) return 'visaFree';
+
+  if (value.includes('no admission')) return 'traditional';
+
+  if (value.includes('visa free') || value === 'visa-free') return 'visaFree';
+
+  if (value.includes('visa on arrival') || value.includes('on arrival')) return 'visaOnArrival';
+
+  if (value.includes('e-visa') || value.includes('evisa') || value === 'eta' || value === 'esta') {
+    return 'evisa';
+  }
+
+  if (value.includes('visa required')) return 'traditional';
+
+  return 'unknown';
+}
+
+function emptyStats(countryName: string): PassportMobilityStats {
+  return {
+    countryName,
+    visaFree: 0,
+    evisa: 0,
+    traditional: 0,
+    visaOnArrival: 0,
+    totalDestinations: 0,
+  };
+}
+
+function aggregateRow(passportName: string, row: string[]): PassportMobilityStats {
+  const stats = emptyStats(resolveCsvCountryName(passportName));
+
+  for (const cell of row) {
+    const bucket = classifyCellForMobility(cell);
+    if (bucket === 'domestic') continue;
+
+    stats.totalDestinations += 1;
+
+    switch (bucket) {
+      case 'visaFree':
+        stats.visaFree += 1;
+        break;
+      case 'evisa':
+        stats.evisa += 1;
+        break;
+      case 'traditional':
+        stats.traditional += 1;
+        break;
+      case 'visaOnArrival':
+        stats.visaOnArrival += 1;
+        break;
+      default:
+        stats.traditional += 1;
+        break;
+    }
+  }
+
+  return stats;
+}
+
+let mobilityIndexCache: Map<string, PassportMobilityStats> | null = null;
+
+/** Passport mobility stats keyed by normalized country name. */
+export function buildPassportMobilityIndex(): Map<string, PassportMobilityStats> {
+  if (mobilityIndexCache) return mobilityIndexCache;
+
+  const index = new Map<string, PassportMobilityStats>();
+  const lines = csvRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines.slice(1)) {
+    const cells = line.split(',');
+    const passport = cells[0]?.trim();
+    if (!passport) continue;
+
+    const passportKey = normalizeCountryKey(resolveCsvCountryName(passport));
+    index.set(passportKey, aggregateRow(passport, cells.slice(1)));
+  }
+
+  mobilityIndexCache = index;
+  return index;
+}
+
+export function getPassportMobilityStats(countryInput: string): PassportMobilityStats | null {
+  if (!countryInput) return null;
+
+  const index = buildPassportMobilityIndex();
+  const key = normalizeCountryKey(resolveCsvCountryName(countryInput));
+  return index.get(key) ?? null;
+}

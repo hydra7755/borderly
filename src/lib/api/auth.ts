@@ -45,6 +45,57 @@ const convertSupabaseUser = (supabaseUser: any): User | null => {
   };
 };
 
+const SESSION_STORAGE_KEY = 'travelscore_session';
+const USER_STORAGE_KEY = 'travelscore_user';
+const MOCK_USER_KEY = 'travelscore_mock_user';
+
+const usesMockAuthClient = (): boolean =>
+  typeof (supabase.auth as any).getUser !== 'function';
+
+const getStoredSession = (): Session | null => {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const getStoredUser = (): User | null => {
+  try {
+    const sessionUser = getStoredSession()?.user;
+    if (sessionUser) return sessionUser as User;
+    const raw = localStorage.getItem(USER_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistSession = (session: Session, user: User) => {
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+};
+
+const clearStoredAuth = () => {
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+  localStorage.removeItem(USER_STORAGE_KEY);
+  localStorage.removeItem(MOCK_USER_KEY);
+};
+
+const getCurrentMockUser = (): MockUser | null => {
+  const storedUser = localStorage.getItem(MOCK_USER_KEY);
+  return storedUser ? JSON.parse(storedUser) : null;
+};
+
+const saveMockUser = (user: User | MockUser | null) => {
+  if (user) {
+    localStorage.setItem(MOCK_USER_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(MOCK_USER_KEY);
+  }
+};
+
 /**
  * Auth service for handling authentication with Supabase
  */
@@ -66,8 +117,8 @@ const authService = {
     error: AuthError | null 
   }> {
     try {
-      // Always use mock implementation in development mode
-      if (import.meta.env.DEV) {
+      // Mock auth only when the Supabase client has no real auth API
+      if (import.meta.env.DEV && usesMockAuthClient()) {
         console.log("DEV MODE: Using mock signup implementation");
         const mockUser: User = {
           id: 'mock-user-id-' + Date.now(),
@@ -95,6 +146,17 @@ const authService = {
         // Store in localStorage to persist the session
         localStorage.setItem('travelscore_user', JSON.stringify(mockUser));
         localStorage.setItem('travelscore_session', JSON.stringify(mockSession));
+        persistSession(mockSession, mockUser);
+        localStorage.setItem('travelscore_user_profile', JSON.stringify({
+          id: mockUser.id,
+          email: mockUser.email,
+          full_name: userData.full_name,
+          nationality: userData.nationality || '',
+          residency: userData.residency || '',
+          travel_score: 0,
+          subscription_tier: 'free',
+          questionnaire_completed: false,
+        }));
         
         return { user: mockUser, session: mockSession, error: null };
       }
@@ -114,6 +176,20 @@ const authService = {
       // Transform data.user to match our User type
       const user = data.user ? convertSupabaseUser(data.user) : null;
       const session = convertSupabaseSession(data.session);
+
+      if (user && !error) {
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          email: user.email,
+          full_name: userData.full_name,
+          nationality: userData.nationality || null,
+          residency: userData.residency || null,
+        });
+      }
+
+      if (user && session) {
+        persistSession(session, user);
+      }
 
       return { user, session, error };
     } catch (error) {
@@ -143,8 +219,8 @@ const authService = {
     error: AuthError | null 
   }> {
     try {
-      // Always use mock implementation in development mode
-      if (import.meta.env.DEV) {
+      // Mock auth only when the Supabase client has no real auth API
+      if (import.meta.env.DEV && usesMockAuthClient()) {
         console.log("DEV MODE: Using mock signin implementation");
         
         // Create a mock user with basic data
@@ -152,8 +228,8 @@ const authService = {
           id: 'mock-user-id-' + Date.now(),
           email: email,
           full_name: 'Mock User',
-          nationality: 'US',
-          residency: 'US',
+          nationality: '',
+          residency: '',
           created_at: new Date().toISOString(),
           subscription_tier: 'free',
           app_metadata: {},
@@ -175,6 +251,7 @@ const authService = {
         // Store in localStorage to persist the session
         localStorage.setItem('travelscore_user', JSON.stringify(mockUser));
         localStorage.setItem('travelscore_session', JSON.stringify(mockSession));
+        persistSession(mockSession, mockUser);
         
         return { user: mockUser, session: mockSession, error: null };
       }
@@ -187,6 +264,10 @@ const authService = {
       // Convert types to our custom types
       const user = data?.user ? convertSupabaseUser(data.user) : null;
       const session = convertSupabaseSession(data?.session);
+
+      if (user && session) {
+        persistSession(session, user);
+      }
       
       return { user, session, error };
     } catch (err) {
@@ -343,8 +424,8 @@ const authService = {
   async signOut(): Promise<{ error: AuthError | null }> {
     try {
       const { error } = await supabase.auth.signOut();
-      // Clear mock user on sign out
-      if (import.meta.env.DEV && typeof (supabase.auth as any).signOut !== 'function') {
+      clearStoredAuth();
+      if (usesMockAuthClient()) {
          console.warn("DEV MODE: Mock sign-out");
          saveMockUser(null);
       }
@@ -364,25 +445,12 @@ const authService = {
     error: AuthError | null;
   }> {
     try {
-      // Always use mock implementation in development mode
-      if (import.meta.env.DEV) {
-        console.log("DEV MODE: Using mock getSession implementation");
-        
-        // Try to get session from localStorage
-        const storedSession = localStorage.getItem('travelscore_session');
-        const storedUser = localStorage.getItem('travelscore_user');
-        
-        if (storedSession && storedUser) {
-          const mockSession = JSON.parse(storedSession);
-          return { session: mockSession, error: null };
-        }
-        
-        // If no stored session, return null
-        return { session: null, error: null };
+      if (usesMockAuthClient()) {
+        return { session: getStoredSession(), error: null };
       }
       
       const { data, error } = await supabase.auth.getSession();
-      const session = convertSupabaseSession(data?.session);
+      const session = convertSupabaseSession(data?.session) ?? getStoredSession();
       return { session, error: error ?? null };
     } catch (error) {
       console.error("Get session error:", error);
@@ -396,17 +464,15 @@ const authService = {
    */
   async getCurrentUser(): Promise<{ user: User | null; error: AuthError | null }> {
     try {
-      // Handle mock user for development
-      if (import.meta.env.DEV && typeof (supabase.auth as any).getUser !== 'function') {
-        console.warn("DEV MODE: Mock getCurrentUser");
-        const mockUser = getCurrentMockUser();
-        return { user: mockUser, error: null };
+      if (usesMockAuthClient()) {
+        const user = getStoredUser() ?? getCurrentMockUser();
+        return { user, error: null };
       }
 
       const { data, error } = await supabase.auth.getUser();
-      const user = data?.user ? convertSupabaseUser(data.user) : null;
-      
-      return { user, error };
+      const user = data?.user ? convertSupabaseUser(data.user) : getStoredUser();
+
+      return { user, error: user ? null : error };
     } catch (error) {
       console.error("Get user error:", error);
       return { user: null, error: error as AuthError };
@@ -476,23 +542,6 @@ const authService = {
       console.error("Unexpected error during password reset initiation:", error);
       return { error: error as AuthError };
     }
-  }
-};
-
-// Moved mock helper functions outside the service object
-const MOCK_USER_KEY = 'travelscore_mock_user';
-
-const getCurrentMockUser = (): MockUser | null => {
-  const storedUser = localStorage.getItem(MOCK_USER_KEY);
-  return storedUser ? JSON.parse(storedUser) : null;
-};
-
-const saveMockUser = (user: User | MockUser | null) => { 
-  if (user) {
-    // Ensure we save the full user object
-    localStorage.setItem(MOCK_USER_KEY, JSON.stringify(user));
-  } else {
-    localStorage.removeItem(MOCK_USER_KEY);
   }
 };
 

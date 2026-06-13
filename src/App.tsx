@@ -31,6 +31,7 @@ import AdminDashboard from './pages/Admin';
 import VisaApplicationPage from './pages/VisaApplicationPage';
 import PaymentPage from './pages/PaymentPage';
 import VisaConfirmationPage from './pages/VisaConfirmationPage';
+import ScrollToTop from './components/ScrollToTop';
 
 // Define types for pages
 type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'questionnaire' | 'world-map' | 'profile' | 'subscription' | 'evisa' | 
@@ -340,10 +341,25 @@ const AppContent: React.FC = () => {
     },
   };
 
-  // Determine whether to show the header and footer
-  const currentPath = location.pathname.slice(1) || 'landing';
-  const showHeaderFooter = currentPath !== 'dashboard' && 
-    !['404', 'notfound', 'world-map', 'profile', 'subscription'].includes(currentPath);
+  // Pages that render their own app shell (header/sidebar) — hide global header/footer
+  const routeRoot = (location.pathname.slice(1).split('/')[0] || 'landing');
+  const appShellRoutes = [
+    'dashboard',
+    'travel-score',
+    'trips',
+    'documents',
+    'settings',
+    'profile',
+    'world-map',
+    'assistant',
+    '404',
+    'notfound',
+    'subscription',
+  ];
+  const isDashboardShell = appShellRoutes.includes(routeRoot);
+  const isEvisaFlow = routeRoot === 'evisa';
+  const showHeader = !isDashboardShell;
+  const showFooter = !isDashboardShell && !isEvisaFlow;
 
   // Login Required Higher Order Component
   const RequireAuth = ({ children }: { children: React.ReactNode }) => {
@@ -368,9 +384,10 @@ const AppContent: React.FC = () => {
 
   return (
       <div className="flex flex-col min-h-screen bg-gray-50">
-        {showHeaderFooter && (
+        {showHeader && (
           <Header 
-            isLoggedIn={isLoggedIn} 
+            isLoggedIn={isLoggedIn}
+            userName={currentUser?.full_name}
           onLoginClick={() => navigate('/login')}
           onSignUpClick={() => navigate('/signup')}
             onLogoutClick={handleLogout}
@@ -390,7 +407,7 @@ const AppContent: React.FC = () => {
               animate="animate"
               exit="exit"
               variants={pageVariants}
-              className="w-full h-full"
+              className="w-full"
             >
             <Routes location={location}>
               <Route path="/" element={
@@ -502,7 +519,7 @@ const AppContent: React.FC = () => {
           </AnimatePresence>
         </main>
         
-        {showHeaderFooter && <Footer />}
+        {showFooter && <Footer />}
 
         {/* Always show ChatBubble when logged in, regardless of page */}
         {isLoggedIn && (
@@ -518,6 +535,7 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <Router>
+      <ScrollToTop />
       <AppContent />
     </Router>
   );

@@ -14,8 +14,12 @@ import userProfileService, { UserProfile } from '../lib/api/userProfile';
 import documentService from '../lib/api/documentService';
 import authService from '../lib/api/auth';
 import visaApplicationsService from '../lib/api/visaApplications';
+import tripsService from '../lib/api/tripsService';
+import CountrySelect from '../components/CountrySelect';
 import VisaApplications from '../components/Dashboard/VisaApplications';
 import { VisaApplication } from '../types/visa';
+import { visaRequirementsService } from '../services/visaRequirementsService';
+import type { PassportMobilityStats } from '../services/visaCsvData';
 
 interface DashboardProps {
   isLoggedIn?: boolean;
@@ -130,6 +134,31 @@ interface VisaRequirementData {
   Requirement: string;
 }
 
+const POPULAR_DESTINATION_META: Record<string, { description: string; tags: string[] }> = {
+  JP: { description: 'Explore ancient temples and modern cities', tags: ['Culture', 'Food'] },
+  NZ: { description: 'Adventure in breathtaking landscapes', tags: ['Nature', 'Adventure'] },
+  TH: { description: 'Relax on pristine beaches', tags: ['Beaches', 'Budget'] },
+  PT: { description: 'Discover rich history and coastal beauty', tags: ['Culture', 'Wine'] },
+  CR: { description: 'Experience breathtaking biodiversity', tags: ['Nature', 'Wildlife'] },
+  ZA: { description: 'Wildlife safari and stunning landscapes', tags: ['Safari', 'Adventure'] },
+  AU: { description: 'Discover iconic landmarks and vibrant cities', tags: ['Nature', 'Adventure'] },
+  IN: { description: 'Experience rich culture and heritage', tags: ['Culture', 'Food'] },
+  TR: { description: 'Where East meets West', tags: ['Culture', 'History'] },
+  EG: { description: 'Ancient wonders and Nile adventures', tags: ['History', 'Culture'] },
+};
+
+const parseEvisaRequirement = (requirement: string): 'e-visa' | 'eta' | null => {
+  const reqType = requirement.toLowerCase().trim();
+  if (reqType === 'eta' || reqType === 'esta') return 'eta';
+  if (reqType === 'e-visa' || reqType === 'evisa' || reqType === 'electronic visa') return 'e-visa';
+  return null;
+};
+
+const resolveNationalityCode = (nationality: string): string => {
+  if (nationality.length === 2) return nationality.toLowerCase();
+  return (visaRequirementsService.getCountryCodeFromName(nationality) || 'gb').toLowerCase();
+};
+
 const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequired, initialTab = 'overview' }) => {
   // State for the map loader
   const mapLoaderState = useMapLoader();
@@ -162,6 +191,7 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
   const [newTripDates, setNewTripDates] = useState<string>('');
   const [newTripStartDate, setNewTripStartDate] = useState<string>('');
   const [newTripEndDate, setNewTripEndDate] = useState<string>('');
+  const [tripSaveError, setTripSaveError] = useState<string | null>(null);
   const [newDocumentName, setNewDocumentName] = useState<string>('');
   const [newDocumentType, setNewDocumentType] = useState<string>('PDF');
   const [selectedCountry, setSelectedCountry] = useState<{
@@ -203,6 +233,8 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
   const [editablePassportNumber, setEditablePassportNumber] = useState<string>('');
   const [editablePassportExpiry, setEditablePassportExpiry] = useState<string>('');
   const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
   
   // Correctly typed extended profile state
   const [currentProfile, setCurrentProfile] = useState<ExtendedUserProfile | null>(null);
@@ -253,34 +285,33 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
           name: extendedProfile.full_name || 'User',
           email: extendedProfile.email || '',
           subscription_tier: extendedProfile.subscription_tier || 'free',
-          nationality: extendedProfile.nationality || '', // Keep original nationality here for user data
-          residency: extendedProfile.residency || '',
+          nationality: extendedProfile.nationality ?? '',
+          residency: extendedProfile.residency ?? '',
           travel_history: extendedProfile.travel_history || [],
           saved_countries: extendedProfile.saved_countries || [],
           travel_score: extendedProfile.travel_score || 0,
-          recent_checks: [], // Replace with actual data if available
+          recent_checks: [],
           saved_documents: extendedProfile.saved_documents || [],
-          upcoming_trips: [], // Replace with actual data if available
+          upcoming_trips: [],
         });
 
-        // Set nationality state specifically for the map, with a fallback
+        const { trips } = await tripsService.getUserTrips();
+        setUserData((prev) => (prev ? { ...prev, upcoming_trips: trips } : prev));
+
         const profileNationality = extendedProfile.nationality;
         if (profileNationality) {
-          // Accept both uppercase and lowercase country codes
-          const normalizedNationality = profileNationality.length === 2 ? 
+          const normalizedNationality = profileNationality.length === 2 ?
             profileNationality.toUpperCase() : profileNationality;
-            
           setNationality(normalizedNationality);
-          console.log('Nationality set in Dashboard state:', normalizedNationality);
         } else {
-          console.warn(`Profile nationality '${profileNationality}' is missing. Defaulting map nationality to 'GB'.`);
-          setNationality('GB'); // Default to GB if missing
+          setNationality('');
         }
 
         // Also update editable fields if needed
         setEditableFullName(extendedProfile.full_name || '');
         setEditableNationality(extendedProfile.nationality || '');
         setEditableResidency(extendedProfile.residency || '');
+        setCurrentProfile(extendedProfile);
 
       } else {
         // Handle case where profile is null but no error (shouldn't happen with maybeSingle but good practice)
@@ -295,10 +326,8 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
     } catch (err) {
       console.error("Error loading user data:", err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      setUserData(null); // Clear data on error
-      // setNationality(''); // Clear nationality on error - No! Set default instead.
-      console.warn("Error loading user data, defaulting map nationality to 'GB'.");
-      setNationality('GB'); // Default nationality on error
+      setUserData(null);
+      setNationality('');
     } finally {
       setIsLoading(false);
     }
@@ -334,35 +363,82 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
   const handleContactClick = () => navigate('/contact');
 
   // Update the handleAddTrip function to match the UserData type
-  const handleAddTrip = () => {
+  const handleAddTrip = async () => {
     if (!newTripDestination || !newTripStartDate || !newTripEndDate) return;
-    
-    // Format dates from calendar input
+
+    setTripSaveError(null);
     const formattedDates = formatDateRange(newTripStartDate, newTripEndDate);
-    
-    const newTrip: UserData['upcoming_trips'][0] = {
-      id: Date.now().toString(),
+
+    const { trip, error } = await tripsService.createTrip({
       destination: newTripDestination,
       departure_date: newTripStartDate,
       return_date: newTripEndDate,
       dates: formattedDates,
       status: 'Planned',
-      documents: []
-    };
-    
-    setUserData(prevData => {
-      if (!prevData) return prevData;
+      documents: [],
+    });
+
+    if (error || !trip) {
+      setTripSaveError(error?.message ?? 'Failed to save trip. Please try again.');
+      return;
+    }
+
+    const nextTrip = { ...trip, dates: formattedDates };
+
+    setUserData((prevData) => {
+      if (!prevData) {
+        return {
+          id: trip.id,
+          name: 'User',
+          email: '',
+          subscription_tier: 'free',
+          nationality: '',
+          residency: '',
+          travel_history: [],
+          saved_countries: [],
+          travel_score: 0,
+          recent_checks: [],
+          saved_documents: [],
+          upcoming_trips: [nextTrip],
+        };
+      }
       return {
         ...prevData,
-        upcoming_trips: [...prevData.upcoming_trips, newTrip]
+        upcoming_trips: [...prevData.upcoming_trips, nextTrip],
       };
     });
-    
-    // Reset form
+
     setNewTripDestination('');
     setNewTripDates('');
     setNewTripStartDate('');
     setNewTripEndDate('');
+  };
+
+  const handleDownloadItinerary = () => {
+    const trips = userData?.upcoming_trips ?? [];
+    if (trips.length === 0) return;
+
+    const lines = trips.map((trip, index) => {
+      const dates = trip.dates ?? `${trip.departure_date} to ${trip.return_date}`;
+      return `${index + 1}. ${trip.destination} (${dates}) — ${trip.status ?? 'Planned'}`;
+    });
+
+    const content = [
+      'Borderly Trip Itinerary',
+      `Generated: ${new Date().toLocaleDateString()}`,
+      '',
+      ...lines,
+    ].join('\n');
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'borderly-itinerary.txt';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
   
   // Helper function to format date range
@@ -380,12 +456,18 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
     }
   };
   
-  const handleRemoveTrip = (tripId: string) => {
-    setUserData(prevData => {
+  const handleRemoveTrip = async (tripId: string) => {
+    const { success, error } = await tripsService.deleteTrip(tripId);
+    if (!success) {
+      alert(error?.message ?? 'Failed to remove trip.');
+      return;
+    }
+
+    setUserData((prevData) => {
       if (!prevData) return prevData;
       return {
         ...prevData,
-        upcoming_trips: prevData.upcoming_trips.filter(trip => trip.id !== tripId)
+        upcoming_trips: prevData.upcoming_trips.filter((trip) => trip.id !== tripId),
       };
     });
   };
@@ -453,14 +535,8 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
   };
 
   // Country management functions
-  const handleCountryClick = (countryCode: string, visaDetails: VisaRequirement) => {
-    const countryName = getCountryName(countryCode) || countryCode;
-    setSelectedCountry({
-      code: countryCode,
-      name: countryName,
-      visaDetails
-    });
-    setShowCountryModal(true);
+  const handlePassportCountryClick = (countryCode: string, _stats: PassportMobilityStats) => {
+    navigate(`/visa-checker?nationality=${countryCode.toLowerCase()}`);
   };
 
   const handleSaveCountry = async (countryCode: string) => {
@@ -696,36 +772,38 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
   // Function to render the user's current country profile info
   const renderUserCountryInfo = () => {
     if (!userData) return null;
-    
+
+    const renderCountryField = (label: string, value: string) => {
+      const hasValue = Boolean(value?.trim());
+      const displayName = hasValue ? getCountryName(value) || value : 'Not set';
+
+      return (
+        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex-1">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</h3>
+          <div className="flex items-center">
+            {hasValue ? (
+              <div className="w-8 h-6 mr-2 overflow-hidden rounded shadow">
+                <img
+                  src={`/images/country-flags-main/svg/${value.toLowerCase()}.svg`}
+                  alt={`${displayName} flag`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-8 h-6 mr-2 rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs text-gray-500">
+                —
+              </div>
+            )}
+            <span className="text-gray-900 dark:text-white font-medium">{displayName}</span>
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex-1">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Nationality</h3>
-          <div className="flex items-center">
-            <div className="w-8 h-6 mr-2 overflow-hidden rounded shadow">
-              <img 
-                src={`/images/country-flags-main/svg/${userData.nationality.toLowerCase()}.svg`} 
-                alt={`${getCountryName(userData.nationality)} flag`}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <span className="text-gray-900 dark:text-white font-medium">{getCountryName(userData.nationality)}</span>
-          </div>
-        </div>
-        
-        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex-1">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Country of Residence</h3>
-          <div className="flex items-center">
-            <div className="w-8 h-6 mr-2 overflow-hidden rounded shadow">
-              <img 
-                src={`/images/country-flags-main/svg/${userData.residency.toLowerCase()}.svg`} 
-                alt={`${getCountryName(userData.residency)} flag`}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <span className="text-gray-900 dark:text-white font-medium">{getCountryName(userData.residency)}</span>
-          </div>
-        </div>
+        {renderCountryField('Nationality', userData.nationality)}
+        {renderCountryField('Country of Residence', userData.residency)}
         
         <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex-1">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Travel Statistics</h3>
@@ -781,60 +859,83 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
 
   // Process recommended destinations when visa requirements are loaded
   useEffect(() => {
-    if (visaRequirements.length > 0 && userData) {
-      // Popular destinations with descriptions and tags
-      const allDestinations = [
-        { name: 'Japan', code: 'JP', description: 'Explore ancient temples and modern cities', tags: ['Culture', 'Food'] },
-        { name: 'New Zealand', code: 'NZ', description: 'Adventure in breathtaking landscapes', tags: ['Nature', 'Adventure'] },
-        { name: 'Thailand', code: 'TH', description: 'Relax on pristine beaches', tags: ['Beaches', 'Budget'] },
-        { name: 'Portugal', code: 'PT', description: 'Discover rich history and coastal beauty', tags: ['Culture', 'Wine'] },
-        { name: 'Costa Rica', code: 'CR', description: 'Experience breathtaking biodiversity', tags: ['Nature', 'Wildlife'] },
-        { name: 'South Africa', code: 'ZA', description: 'Wildlife safari and stunning landscapes', tags: ['Safari', 'Adventure'] },
-      ];
-
-      // Get user nationality, default to GB if not available
-      const nationality = userData?.nationality || 'GB';
-      
-      // Map destinations with visa requirements
-      const destinationsWithVisaStatus = allDestinations.map(destination => {
-        // Find the visa requirement for user's nationality to this destination
-        const requirement = visaRequirements.find((req: VisaRequirementData) => 
-          req.Passport === getCountryName(nationality) && 
-          req.Destination === getCountryName(destination.code)
-        );
-        
-        let visa_status = 'visa-required';
-        
-        if (requirement) {
-          const reqType = requirement.Requirement.toLowerCase();
-          if (reqType === 'visa free' || reqType === 'free') {
-            visa_status = 'visa-free';
-          } else if (reqType === 'visa on arrival' || reqType === 'on arrival') {
-            visa_status = 'visa-on-arrival';
-          } else if (reqType === 'e-visa' || reqType === 'evisa' || reqType === 'eta' || reqType === 'esta') {
-            visa_status = 'e-visa';
-          }
-        }
-        
-        return {
-          ...destination,
-          visa_status
-        };
-      });
-      
-      setRecommendationDestinations(destinationsWithVisaStatus);
+    if (visaRequirements.length === 0 || !userData?.nationality) {
+      setRecommendationDestinations([]);
+      return;
     }
-  }, [visaRequirements, userData]);
+
+    const nationality = userData.nationality;
+    const passportName = getCountryName(nationality) || nationality;
+
+    const evisaDestinations = visaRequirements
+      .filter((req: VisaRequirementData) => {
+        if (req.Passport !== passportName) return false;
+        return parseEvisaRequirement(req.Requirement) !== null;
+      })
+      .map((req: VisaRequirementData) => {
+        const visa_status = parseEvisaRequirement(req.Requirement)!;
+        const code =
+          visaRequirementsService.getCountryCodeFromName(req.Destination)?.toUpperCase() || '';
+        const meta = POPULAR_DESTINATION_META[code] || {
+          description: `Apply online for travel authorization to ${req.Destination}`,
+          tags: [visa_status === 'eta' ? 'ETA' : 'eVisa'],
+        };
+
+        return {
+          name: req.Destination,
+          code,
+          description: meta.description,
+          tags: meta.tags,
+          visa_status,
+        };
+      })
+      .filter((destination) => destination.code);
+
+    // Deduplicate by country code (visa data can contain duplicate rows)
+    const uniqueByCode = new Map<string, typeof evisaDestinations[number]>();
+    for (const destination of evisaDestinations) {
+      if (!uniqueByCode.has(destination.code)) {
+        uniqueByCode.set(destination.code, destination);
+      }
+    }
+    const uniqueDestinations = Array.from(uniqueByCode.values());
+
+    // Prefer popular destinations first, then alphabetically by name
+    const popularCodes = Object.keys(POPULAR_DESTINATION_META);
+    uniqueDestinations.sort((a, b) => {
+      const aPopular = popularCodes.indexOf(a.code);
+      const bPopular = popularCodes.indexOf(b.code);
+      if (aPopular !== -1 && bPopular !== -1) return aPopular - bPopular;
+      if (aPopular !== -1) return -1;
+      if (bPopular !== -1) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    setRecommendationDestinations(uniqueDestinations.slice(0, 6));
+  }, [visaRequirements, userData?.nationality]);
 
   // Styling for recommended destination cards
   const renderRecommendedDestinations = () => {
+    const nationalityCode = userData?.nationality
+      ? resolveNationalityCode(userData.nationality)
+      : '';
+
     return (
       <div className="mt-8">
         <h3 className="text-xl font-semibold mb-4">Recommended Destinations</h3>
+        {!userData?.nationality ? (
+          <p className="text-gray-500 text-sm">
+            Set your nationality in Settings to see eVisa and ETA destinations available to you.
+          </p>
+        ) : recommendationDestinations.length === 0 ? (
+          <p className="text-gray-500 text-sm">
+            No eVisa or ETA destinations are available for your nationality at this time.
+          </p>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {recommendationDestinations.map((destination, index) => (
+          {recommendationDestinations.map((destination) => (
             <div 
-              key={index}
+              key={destination.code}
               className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
             >
               <div className="p-4">
@@ -847,20 +948,8 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
                   <h4 className="font-semibold text-lg">{destination.name}</h4>
                 </div>
                 
-                <span className={`inline-block px-2 py-1 text-xs rounded-full mb-2 ${
-                  destination.visa_status === 'visa-free' 
-                    ? 'bg-green-100 text-green-800' 
-                    : destination.visa_status === 'visa-on-arrival' || destination.visa_status === 'e-visa'
-                      ? 'bg-blue-100 text-blue-800' 
-                      : 'bg-amber-100 text-amber-800'
-                }`}>
-                  {destination.visa_status === 'visa-free' 
-                    ? 'Visa Free' 
-                    : destination.visa_status === 'visa-on-arrival' 
-                      ? 'Visa on Arrival'
-                      : destination.visa_status === 'e-visa'
-                        ? 'E-Visa'
-                        : 'Visa Required'}
+                <span className="inline-block px-2 py-1 text-xs rounded-full mb-2 bg-blue-100 text-blue-800">
+                  {destination.visa_status === 'eta' ? 'ETA Available' : 'eVisa Available'}
                 </span>
                 
                 <p className="text-gray-600 text-sm mb-3">{destination.description}</p>
@@ -877,10 +966,10 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
                 </div>
                 
                 <Link 
-                  to={`/blogs/${destination.code.toLowerCase()}`}
+                  to={`/visa/${destination.code.toLowerCase()}?nationality=${nationalityCode}`}
                   className="mt-2 text-teal-600 hover:text-teal-800 font-medium text-sm flex items-center"
                 >
-                  Explore Country
+                  Apply eVisa
                   <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
@@ -889,6 +978,7 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
             </div>
           ))}
         </div>
+        )}
       </div>
     );
   };
@@ -1440,36 +1530,58 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
 
   // Handle saving changes in settings
   const handleSaveChanges = async () => {
-    if (!currentProfile) {
-        setError("User profile not loaded. Cannot save changes.");
-        return;
+    if (!currentProfile && !userData?.id) {
+      setSettingsError('User profile not loaded. Please refresh the page and try again.');
+      return;
     }
-    
+
     setIsSavingSettings(true);
-    setError(null);
-    
+    setSettingsError(null);
+    setSettingsSuccess(null);
+
     const updatedProfileData: Partial<UserProfile> = {
       full_name: editableName,
+      nationality: editableNationality,
+      residency: editableResidency,
       phone_number: editablePhoneNumber,
       passport_number: editablePassportNumber,
-      passport_expiry: editablePassportExpiry, 
+      passport_expiry: editablePassportExpiry,
     };
-    
+
     try {
-      // Pass the current user's ID to updateProfile
-      const { error } = await userProfileService.updateProfile(updatedProfileData);
-      
+      const { profile, error } = await userProfileService.updateProfile(updatedProfileData);
+
       if (error) {
-        console.error("Error updating profile:", error);
-        setError("Failed to save settings. Please try again.");
+        console.error('Error updating profile:', error);
+        setSettingsError('Failed to save settings. Please try again.');
       } else {
-        console.log("Profile updated successfully!");
-        alert('Settings saved successfully!');
-        await loadUserData(); // Reload data after successful save
+        setSettingsSuccess('Settings saved successfully.');
+        if (profile) {
+          setCurrentProfile(profile as ExtendedUserProfile);
+        }
+
+        setUserData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            name: editableName || prev.name,
+            nationality: editableNationality,
+            residency: editableResidency,
+          };
+        });
+
+        if (editableNationality) {
+          const normalizedNationality = editableNationality.length === 2
+            ? editableNationality.toUpperCase()
+            : editableNationality;
+          setNationality(normalizedNationality);
+        } else {
+          setNationality('');
+        }
       }
     } catch (err) {
-      console.error("Unexpected error saving settings:", err);
-      setError("An unexpected error occurred while saving settings.");
+      console.error('Unexpected error saving settings:', err);
+      setSettingsError('An unexpected error occurred while saving settings.');
     } finally {
       setIsSavingSettings(false);
     }
@@ -1491,9 +1603,12 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
     return (
         <div className="card p-6">
             <h3 className="text-xl font-semibold mb-6">Account Settings</h3>
-            
-            {error && (
-                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{error}</div>
+
+            {settingsError && (
+                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{settingsError}</div>
+            )}
+            {settingsSuccess && (
+                <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">{settingsSuccess}</div>
             )}
             
             <div className="space-y-6">
@@ -1513,7 +1628,25 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                            <input type="email" value={currentProfile?.email || ''} readOnly className="mt-1 input w-full bg-gray-100 cursor-not-allowed" />
+                            <input type="email" value={currentProfile?.email || userData?.email || ''} readOnly className="mt-1 input w-full bg-gray-100 cursor-not-allowed" />
+                        </div>
+                        <div>
+                            <CountrySelect
+                              id="settings-nationality"
+                              label="Nationality"
+                              value={editableNationality}
+                              onChange={setEditableNationality}
+                              placeholder="Select your nationality"
+                            />
+                        </div>
+                        <div>
+                            <CountrySelect
+                              id="settings-residency"
+                              label="Country of Residence"
+                              value={editableResidency}
+                              onChange={setEditableResidency}
+                              placeholder="Select your country of residence"
+                            />
                         </div>
                          <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
@@ -1592,9 +1725,9 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
         transition={{ duration: 0.2 }}
       >
         {isMapLibraryLoaded ? (
-          <VisaRequirementsMap // Use the enhanced component directly
-            userNationality={userData?.nationality || 'GB'} 
-            onCountrySelect={handleCountryClick} // Pass the correct handler
+          <VisaRequirementsMap
+            userNationality={userData?.nationality || ''}
+            onCountrySelect={handlePassportCountryClick}
           />
         ) : mapLibraryHasError ? (
            <div className="p-8 text-center text-red-600">
@@ -1652,7 +1785,24 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
     >
-      <h3 className="text-xl font-semibold mb-4">Trip Planning</h3>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <h3 className="text-xl font-semibold">Trip Planning</h3>
+        {(userData?.upcoming_trips.length ?? 0) > 0 && (
+          <button
+            type="button"
+            className="btn-secondary text-sm w-full sm:w-auto"
+            onClick={handleDownloadItinerary}
+          >
+            Download Itinerary
+          </button>
+        )}
+      </div>
+
+      {tripSaveError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {tripSaveError}
+        </div>
+      )}
       
       {/* Add trip form */}
       <div className="mb-6 bg-gray-50 p-4 rounded-lg">
@@ -1844,31 +1994,27 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
   useEffect(() => {
     const fetchVisaApplications = async () => {
       if (!userData?.id) return;
-      
+
       setIsLoadingApplications(true);
       setApplicationsError(null);
-      
+
       try {
         const { applications, error } = await visaApplicationsService.getUserApplications(userData.id);
-        
+
         if (error) {
-          console.error('Error fetching visa applications:', error);
           setApplicationsError('Failed to load visa applications. Please try again.');
-        } else if (applications) {
-          setVisaApplications(applications);
+        } else {
+          setVisaApplications(applications ?? []);
         }
       } catch (err) {
-        console.error('Unexpected error fetching visa applications:', err);
         setApplicationsError('An unexpected error occurred while loading visa applications.');
       } finally {
         setIsLoadingApplications(false);
       }
     };
-    
-    if (activeTab === 'visa-applications') {
-      fetchVisaApplications();
-    }
-  }, [userData?.id, activeTab, reloadKey]); // Line 1869 based on previous logs
+
+    fetchVisaApplications();
+  }, [userData?.id, reloadKey]);
 
   // Handle refreshing visa applications
   const handleRefreshApplications = () => {
@@ -1990,6 +2136,7 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       <Header 
         isLoggedIn={true}
+        userName={userData?.name}
         onLoginClick={handleLoginClick}
         onSignUpClick={handleSignUpClick}
         onLogoutClick={handleLogoutClick}
@@ -2006,7 +2153,7 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
         </div>
         
         {/* Main content area with padding */}
-        <main className="flex-1 md:pl-64 overflow-y-auto"> {/* Adjust pl-64 for sidebar width */}
+        <main className="flex-1 md:pl-64">
           <div className="container mx-auto py-8 px-4">
             <AnimatePresence mode="wait">
               <motion.div

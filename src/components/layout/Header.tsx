@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getInitials } from '../../utils/userDisplay';
 
 interface HeaderProps {
   isLoggedIn: boolean;
+  userName?: string;
   onLoginClick: () => void;
   onSignUpClick: () => void;
   onLogoutClick: () => void;
@@ -15,6 +17,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({
   isLoggedIn,
+  userName,
   onLoginClick,
   onSignUpClick,
   onLogoutClick,
@@ -124,7 +127,7 @@ const Header: React.FC<HeaderProps> = ({
                     className="flex items-center space-x-2 bg-white p-2 rounded-full border border-gray-300"
                   >
                     <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                      US
+                      {getInitials(userName)}
                     </div>
                   </button>
                 </div>
