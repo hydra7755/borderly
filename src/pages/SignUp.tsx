@@ -91,7 +91,10 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
         setIsLoading(false);
       }
     } catch (err) {
-      setError('An unexpected error occurred. Please try again.');
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
+      setError(message.includes('Failed to fetch')
+        ? 'Unable to connect to the authentication server. Supabase may not be configured for this site yet.'
+        : message);
       console.error(err);
       setIsLoading(false);
     }

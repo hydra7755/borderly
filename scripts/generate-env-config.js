@@ -11,10 +11,6 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Fallback values for development
-const FALLBACK_SUPABASE_URL = 'https://ijtguirploawplzkwdin.supabase.co';
-const FALLBACK_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqdGd1aXJwbG9hd3Bsemt3ZGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTY5NjM3MTUsImV4cCI6MjAzMjUzOTcxNX0.9Tq-EBDOVuZzGCE_JsNIJZ-Jj0y3XPLyZJNzPpRRlz4';
-
 // Define variables that should be available in the browser
 const environmentVars = {
   // API Configuration - support both naming conventions
@@ -30,11 +26,11 @@ const environmentVars = {
   // OCR API URL
   VITE_OCR_API_URL: process.env.VITE_OCR_API_URL || process.env.REACT_APP_API_BASE_URL || 'http://localhost:5175/api',
   
-  // Supabase Configuration - support both naming conventions with fallbacks
-  REACT_APP_SUPABASE_URL: process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL,
-  REACT_APP_SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || FALLBACK_SUPABASE_ANON_KEY,
-  VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || FALLBACK_SUPABASE_URL,
-  VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY || FALLBACK_SUPABASE_ANON_KEY,
+  // Supabase Configuration - must be set via environment variables
+  REACT_APP_SUPABASE_URL: process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
+  REACT_APP_SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
+  VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || '',
+  VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY || '',
   
   // Other environment variables can be added here
 };

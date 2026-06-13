@@ -118,7 +118,16 @@ const authService = {
       return { user, session, error };
     } catch (error) {
       console.error("Unexpected signup error:", error);
-      return { user: null, session: null, error: error as AuthError };
+      const message = error instanceof TypeError && error.message === 'Failed to fetch'
+        ? 'Unable to reach the authentication server. Check that Supabase is configured and your project is active.'
+        : error instanceof Error
+          ? error.message
+          : 'An unexpected error occurred during signup.';
+      return {
+        user: null,
+        session: null,
+        error: { message, name: 'AuthApiError', status: 503 } as AuthError,
+      };
     }
   },
 
