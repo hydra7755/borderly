@@ -1,6 +1,7 @@
 import { ALL_COUNTRIES } from './countries';
 import { VisaProduct, generateStandardFAQs, generateCloudinaryUrls } from '../types/visaProduct';
 import { getCountryNameFromCode } from '../lib/api/visaRequirements';
+import { getVisaFeeForCountry } from '../data/visaFees';
 
 /**
  * Generate visa product data for a specific country
@@ -151,39 +152,7 @@ export const generateVisaProductForCountry = (
       break;
   }
 
-  // Country-specific visa prices in GBP
-  const countryVisaPrices: Record<string, number> = {
-    // eVisa prices
-    'India': 75, // India
-    'Turkey': 60, // Turkey
-    'Egypt': 45, // Egypt
-    'Vietnam': 40, // Vietnam
-    'Cambodia': 35, // Cambodia
-    'Myanmar': 50, // Myanmar
-    
-    // ETA prices
-    'Sri Lanka': 30, // Sri Lanka
-    'Australia': 20, // Australia
-    
-    // Visa required prices (embassy/consulate application)
-    'China': 160, // China
-    'Russia': 120, // Russia
-    'Brazil': 90,  // Brazil
-    'South Africa': 75,  // South Africa
-    
-    // Visa on arrival prices
-    'Thailand': 35, // Thailand
-    'Nepal': 30, // Nepal
-    'Indonesia': 35, // Indonesia
-    'Laos': 30, // Laos
-  };
-
-  // Get country-specific price or use default based on visa type
-  const visaPrice = countryVisaPrices[country.name] || 
-                    (visaType === 'visa-required' ? 100 : 
-                     visaType === 'evisa' ? 50 : 
-                     visaType === 'eta' ? 20 : 
-                     visaType === 'visa-on-arrival' ? 30 : 0);
+  const visaPrice = getVisaFeeForCountry(country.name);
 
   // Generate a product object with all required properties
   const product: VisaProduct = {

@@ -35,6 +35,10 @@ const environmentVars = {
   // Official company inbox (contact forms, applications)
   VITE_CONTACT_EMAIL: process.env.VITE_CONTACT_EMAIL || process.env.REACT_APP_CONTACT_EMAIL || 'contactborderly@gmail.com',
   REACT_APP_CONTACT_EMAIL: process.env.REACT_APP_CONTACT_EMAIL || process.env.VITE_CONTACT_EMAIL || 'contactborderly@gmail.com',
+
+  // Stripe publishable key (safe for browser)
+  VITE_STRIPE_PUBLIC_KEY: process.env.VITE_STRIPE_PUBLIC_KEY || process.env.REACT_APP_STRIPE_PUBLIC_KEY || '',
+  REACT_APP_STRIPE_PUBLIC_KEY: process.env.REACT_APP_STRIPE_PUBLIC_KEY || process.env.VITE_STRIPE_PUBLIC_KEY || '',
 };
 
 // Create the window._env_ content

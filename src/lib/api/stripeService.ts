@@ -1,116 +1,102 @@
-import { loadStripe } from '@stripe/stripe-js';
-import { supabase } from '../supabase/client';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
+import authService from './auth';
+import { SubscriptionType, BillingCycle } from '../../config/stripePricing';
 
-// Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
-
-/**
- * Service to handle Stripe-related operations
- */
-class StripeService {
-  /**
-   * Create a checkout session for subscription payment
-   * @param subscriptionType The type of subscription (premium/enterprise)
-   * @param billingCycle The billing cycle (monthly/annual/lifetime)
-   * @returns Checkout session ID
-   */
-  async createCheckoutSession(
-    subscriptionType: string,
-    billingCycle: 'monthly' | 'annual' | 'lifetime'
-  ): Promise<string> {
-    try {
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { 
-          subscriptionType, 
-          billingCycle,
-          successUrl: window.location.origin + '/subscription/success',
-          cancelUrl: window.location.origin + '/pricing'
-        }
-      });
-
-      if (error) {
-        throw new Error(`Error creating checkout session: ${error.message}`);
-      }
-
-      return data.sessionId;
-    } catch (error) {
-      console.error('Error in createCheckoutSession:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Redirect to Stripe checkout
-   * @param sessionId The Stripe checkout session ID
-   */
-  async redirectToCheckout(sessionId: string): Promise<void> {
-    try {
-      const stripe = await stripePromise;
-      if (!stripe) {
-        throw new Error('Failed to load Stripe');
-      }
-
-      const { error } = await stripe.redirectToCheckout({ sessionId });
-      
-      if (error) {
-        console.error('Error during redirectToCheckout:', error);
-        throw error;
-      }
-    } catch (error) {
-      console.error('Error in redirectToCheckout:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create a payment intent for one-time visa application payment
-   * @param amount Amount to charge in cents
-   * @param applicationId The visa application ID
-   * @returns Payment intent client secret
-   */
-  async createPaymentIntent(amount: number, applicationId: string): Promise<string> {
-    try {
-      const { data, error } = await supabase.functions.invoke('create-payment-intent', {
-        body: { 
-          amount,
-          applicationId,
-          currency: 'gbp'
-        }
-      });
-
-      if (error) {
-        throw new Error(`Error creating payment intent: ${error.message}`);
-      }
-
-      return data.clientSecret;
-    } catch (error) {
-      console.error('Error in createPaymentIntent:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if a user has an active subscription
-   * @returns Whether the user has an active subscription
-   */
-  async checkSubscriptionStatus(): Promise<{
-    isActive: boolean;
-    tier?: string;
-    expiry?: string;
-  }> {
-    try {
-      const { data, error } = await supabase.functions.invoke('check-subscription-status');
-
-      if (error) {
-        throw new Error(`Error checking subscription status: ${error.message}`);
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in checkSubscriptionStatus:', error);
-      return { isActive: false };
-    }
+declare global {
+  interface Window {
+    _env_?: Record<string, string>;
   }
 }
 
-export const stripeService = new StripeService(); 
+function getStripePublishableKey(): string {
+  return (
+    import.meta.env.VITE_STRIPE_PUBLIC_KEY ||
+    (typeof window !== 'undefined' ? window._env_?.VITE_STRIPE_PUBLIC_KEY : '') ||
+    ''
+  );
+}
+
+let stripePromise: Promise<Stripe | null> | null = null;
+
+export function getStripePromise(): Promise<Stripe | null> {
+  const stripePublishableKey = getStripePublishableKey();
+  if (!stripePublishableKey) {
+    console.warn('VITE_STRIPE_PUBLIC_KEY is not configured');
+    return Promise.resolve(null);
+  }
+  if (!stripePromise) {
+    stripePromise = loadStripe(stripePublishableKey);
+  }
+  return stripePromise;
+}
+
+const API_BASE = '/.netlify/functions';
+
+async function postJson<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const response = await fetch(`${API_BASE}/${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `Request failed (${response.status})`);
+  }
+  return data as T;
+}
+
+async function getJson<T>(path: string, params: Record<string, string>): Promise<T> {
+  const query = new URLSearchParams(params).toString();
+  const response = await fetch(`${API_BASE}/${path}?${query}`);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `Request failed (${response.status})`);
+  }
+  return data as T;
+}
+
+class StripeService {
+  async createCheckoutSession(
+    subscriptionType: SubscriptionType,
+    billingCycle: BillingCycle
+  ): Promise<{ sessionId: string; url: string }> {
+    const { user } = await authService.getCurrentUser();
+
+    return postJson('create-checkout-session', {
+      subscriptionType,
+      billingCycle,
+      successUrl: `${window.location.origin}/subscription-success`,
+      cancelUrl: `${window.location.origin}/pricing`,
+      customerEmail: user?.email,
+    });
+  }
+
+  async redirectToCheckout(sessionUrl: string): Promise<void> {
+    window.location.href = sessionUrl;
+  }
+
+  async createPaymentIntent(amountPence: number, applicationId: string): Promise<string> {
+    const data = await postJson<{ clientSecret: string }>('create-payment-intent', {
+      amount: amountPence,
+      applicationId,
+      currency: 'gbp',
+    });
+    return data.clientSecret;
+  }
+
+  async verifyCheckoutSession(sessionId: string): Promise<{
+    paid: boolean;
+    subscriptionType: string | null;
+    billingCycle: string | null;
+    customerEmail: string | null;
+  }> {
+    return getJson('get-checkout-session', { session_id: sessionId });
+  }
+
+  isConfigured(): boolean {
+    return Boolean(getStripePublishableKey());
+  }
+}
+
+export const stripeService = new StripeService();

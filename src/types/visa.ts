@@ -22,6 +22,7 @@ export interface VisaApplication {
   purpose_of_visit?: string;
   entry_date?: string;
   exit_date?: string;
+  application_data?: Record<string, unknown>;
 }
 
 // Color mapping for visa requirement types

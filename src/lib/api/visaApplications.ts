@@ -47,6 +47,7 @@ function mapApplicationRow(row: Record<string, unknown>): VisaApplication {
     purpose_of_visit: row.purpose_of_visit as string | undefined,
     entry_date: row.entry_date as string | undefined,
     exit_date: row.exit_date as string | undefined,
+    application_data: row.application_data as Record<string, unknown> | undefined,
   };
 }
 
@@ -165,7 +166,7 @@ const visaApplicationsService = {
         return { application: null, error };
       }
 
-      return { application: data as VisaApplication, error: null };
+      return { application: mapApplicationRow(data as Record<string, unknown>), error: null };
     } catch (error) {
       console.error('Unexpected error fetching visa application:', error);
       return { application: null, error: error as Error };

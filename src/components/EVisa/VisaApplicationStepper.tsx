@@ -3,12 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaCamera, FaPassport, FaCalendarAlt, FaUsers, FaCreditCard, FaInfoCircle, FaCheckCircle, FaPlane, FaCheck, FaUpload } from 'react-icons/fa';
 import { FaCcVisa, FaCcMastercard, FaCcAmex } from 'react-icons/fa';
 import './VisaApplicationStepper.css';
-import { SUBSCRIPTION_PLANS } from '../../types/subscription';
 import authService from '../../lib/api/auth';
 import { userProfileService } from '../../lib/api/userProfile';
+import { getVisaFeeForCountryCode } from '../../data/visaFees';
+import {
+  getDiscountedServiceFeeGbp,
+  getServiceFeeDiscountPercent,
+} from '../../config/visaServiceFee';
 
 interface VisaApplicationStepperProps {
   onComplete?: (data: FormData) => void;
+  destinationCode?: string;
 }
 
 interface PassportData {
@@ -179,7 +184,10 @@ const parseOcrText = (text: string | null): Partial<PassportData> => {
   return extracted;
 };
 
-const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onComplete }) => {
+const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
+  onComplete,
+  destinationCode = 'tr',
+}) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [currentSamplePhoto, setCurrentSamplePhoto] = useState<'male' | 'female'>('female');
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -206,7 +214,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
   const [processingTraveler, setProcessingTraveler] = useState(false);
   const [travelerStep, setTravelerStep] = useState<number>(1);
   const MAX_TRAVELERS = 10;
-  const [subscriptionTier, setSubscriptionTier] = useState<'free' | 'monthly' | 'lifetime'>('free');
+  const [subscriptionTier, setSubscriptionTier] = useState<string>('free');
   
   // Add effect to alternate photos every 5 seconds
   useEffect(() => {
@@ -264,7 +272,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
       try {
         const { profile } = await userProfileService.getCurrentUserProfile();
         if (profile) {
-          setSubscriptionTier(profile.subscription_tier as 'free' | 'monthly' | 'lifetime');
+          setSubscriptionTier(profile.subscription_tier || 'free');
         }
       } catch (error) {
         console.error('Error fetching user subscription:', error);
@@ -274,24 +282,17 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
     fetchUserSubscription();
   }, []);
   
-  // Add service fee calculation functions
-  const BASE_SERVICE_FEE = 25.00; // £25 base service fee
-  const VISA_FEE = 123.14; // Standard visa fee per traveler
-  
+  const visaFeePerTraveler = getVisaFeeForCountryCode(destinationCode);
+
   const getServiceFee = (): number => {
-    // Get discount percentage based on subscription tier
-    const subscriptionPlan = SUBSCRIPTION_PLANS.find(plan => plan.tier === subscriptionTier);
-    const discountPercentage = subscriptionPlan?.visa_discount_percentage || 0;
-    
-    // Calculate discounted service fee
-    const discountedFee = BASE_SERVICE_FEE * (1 - discountPercentage / 100);
-    return Number(discountedFee.toFixed(2));
+    const discountPercentage = getServiceFeeDiscountPercent(subscriptionTier);
+    return getDiscountedServiceFeeGbp(discountPercentage);
   };
-  
+
   const getTotalFee = (): number => {
-    const travelerCount = formData.travelers.length + 1; // Main applicant + additional travelers
+    const travelerCount = formData.travelers.length + 1;
     const serviceFee = getServiceFee();
-    return Number((VISA_FEE * travelerCount + serviceFee).toFixed(2));
+    return Number((visaFeePerTraveler * travelerCount + serviceFee).toFixed(2));
   };
 
   const [formData, setFormData] = useState<FormData>({
@@ -2357,14 +2358,14 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({ onCompl
                     <div className="space-y-4">
                       <div className="flex justify-between items-center pb-3">
                         <span className="text-gray-700 text-lg">Visa Fee ({formData.travelers.length + 1} travelers)</span>
-                        <span className="text-lg font-semibold">£{(VISA_FEE * (formData.travelers.length + 1)).toFixed(2)}</span>
+                        <span className="text-lg font-semibold">£{(visaFeePerTraveler * (formData.travelers.length + 1)).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between items-center pb-3">
                         <div>
                           <span className="text-gray-700 text-lg">Service Fee</span>
                           {subscriptionTier !== 'free' && (
                             <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
-                              {SUBSCRIPTION_PLANS.find(plan => plan.tier === subscriptionTier)?.visa_discount_percentage}% off
+                              {getServiceFeeDiscountPercent(subscriptionTier)}% off
                             </span>
                           )}
                         </div>

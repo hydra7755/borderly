@@ -6,6 +6,12 @@ import { visaRequirementsService } from '../../services/visaRequirementsService'
 import { ALL_COUNTRIES } from '../../utils/countries';
 import ImageSlider from '../ImageSlider';
 import BlogSlider from '../Blog/BlogSlider';
+import { getVisaFeeForCountryCode } from '../../data/visaFees';
+import {
+  getDiscountedServiceFeeGbp,
+  getServiceFeeDiscountPercent,
+} from '../../config/visaServiceFee';
+import { userProfileService } from '../../lib/api/userProfile';
 import { 
   FaGlobe, 
   FaPassport, 
@@ -91,7 +97,7 @@ const VisaProductPage: React.FC<VisaProductPageProps> = ({ product }) => {
 
   // User subscription status (mock - would come from user profile)
   const [userSubscription, setUserSubscription] = useState<{
-    status: 'none' | 'basic' | 'premium' | 'business';
+    status: 'none' | 'free' | 'premium' | 'enterprise';
     discountPercentage: number;
   }>({ status: 'none', discountPercentage: 0 });
 
@@ -109,44 +115,29 @@ const VisaProductPage: React.FC<VisaProductPageProps> = ({ product }) => {
       // Use local variables to collect state updates
       let nationalityValue: string | null = null;
       let nationalityNameValue: string = '';
-      let subscriptionValue = { 
-        status: 'none' as 'none' | 'basic' | 'premium' | 'business', 
-        discountPercentage: 0 
+      let subscriptionValue = {
+        status: 'none' as 'none' | 'free' | 'premium' | 'enterprise',
+        discountPercentage: 0,
       };
-      
-      // Determine nationality
+
+      try {
+        const { profile } = await userProfileService.getCurrentUserProfile();
+        if (profile?.subscription_tier) {
+          const tier = profile.subscription_tier as 'free' | 'premium' | 'enterprise';
+          subscriptionValue.status = tier === 'free' ? 'free' : tier;
+          subscriptionValue.discountPercentage = getServiceFeeDiscountPercent(tier);
+        }
+        if (profile?.nationality) {
+          nationalityValue = profile.nationality;
+        }
+      } catch {
+        // Keep default (no discount)
+      }
+
       if (nationalityFromUrl) {
         nationalityValue = nationalityFromUrl;
-      } else if (user) {
-        try {
-          const userProfile = await fetch(`/api/user/profile/${user.id}`).then(res => res.json());
-          nationalityValue = userProfile.nationality || null;
-          
-          // Handle subscription info
-          if (userProfile.subscription) {
-            subscriptionValue.status = userProfile.subscription.status || 'none';
-            
-            // Calculate discount based on subscription tier
-            switch (subscriptionValue.status) {
-              case 'basic': subscriptionValue.discountPercentage = 10; break;
-              case 'premium': subscriptionValue.discountPercentage = 20; break;
-              case 'business': subscriptionValue.discountPercentage = 30; break;
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching user profile:', error);
-          nationalityValue = user.nationality || null;
-        }
-      } else {
-        // Demo random subscription (only for non-logged in users)
-        const demoSubscriptions = ['none', 'basic', 'premium', 'business'];
-        subscriptionValue.status = demoSubscriptions[Math.floor(Math.random() * demoSubscriptions.length)] as any;
-        
-        switch (subscriptionValue.status) {
-          case 'basic': subscriptionValue.discountPercentage = 10; break;
-          case 'premium': subscriptionValue.discountPercentage = 20; break;
-          case 'business': subscriptionValue.discountPercentage = 30; break;
-        }
+      } else if (!nationalityValue && user?.nationality) {
+        nationalityValue = user.nationality;
       }
       
       // Set the country name if nationality was found
@@ -287,40 +278,10 @@ const VisaProductPage: React.FC<VisaProductPageProps> = ({ product }) => {
     return `${getCurrencySymbol(selectedCurrency)}${amount.toFixed(2)}`;
   };
 
-  // Calculate eVisa application fee based on the country
-  const getVisaApplicationFee = () => {
-    // Fixed fee for each country to avoid fluctuations
-    const fixedFees: {[key: string]: number} = {
-      'USA': 61.57,
-      'CAN': 61.57,
-      'GBR': 61.57,
-      'AUS': 61.57,
-      'NZL': 61.57,
-      'DEU': 61.57,
-      'FRA': 61.57,
-      'ITA': 61.57,
-      'ESP': 61.57,
-      'JPN': 61.57,
-      'CHN': 61.57,
-      'IND': 61.57,
-      'BRA': 61.57,
-      'ZAF': 61.57,
-      'RUS': 61.57,
-      'TUR': 61.57,
-    };
-    
-    return fixedFees[product.countryCode] || 61.57; // Fixed fee for all countries
-  };
-  
-  // Calculate service fee with subscription discount
-  const getDiscountedServiceFee = () => {
-    if (userSubscription.discountPercentage === 0) {
-      return 58.95;
-    }
-    
-    const discountAmount = 58.95 * (userSubscription.discountPercentage / 100);
-    return 58.95 - discountAmount;
-  };
+  const getVisaApplicationFee = () => getVisaFeeForCountryCode(product.countryCode);
+
+  const getDiscountedServiceFee = () =>
+    getDiscountedServiceFeeGbp(userSubscription.discountPercentage);
   
   // Get subscription name for display
   const getSubscriptionName = (): string => {
@@ -329,8 +290,8 @@ const VisaProductPage: React.FC<VisaProductPageProps> = ({ product }) => {
         return 'Basic';
       case 'premium':
         return 'Premium';
-      case 'business':
-        return 'Business';
+      case 'enterprise':
+        return 'Enterprise';
       default:
         return 'None';
     }

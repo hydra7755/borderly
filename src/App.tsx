@@ -317,11 +317,6 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Function to handle successful checkout
-  const handleCheckoutComplete = () => {
-    navigate('/subscription-success');
-  };
-
   // Page transition variants
   const pageVariants = {
     initial: {
@@ -506,8 +501,8 @@ const AppContent: React.FC = () => {
                 </RequireAuth>
               } />
               <Route path="/questionnaire" element={<TravelScoreQuestionnaire onSignUp={() => navigate('/signup')} isLoggedIn={isLoggedIn} />} />
-              <Route path="/checkout" element={<RequireAuth><Checkout subscriptionType={checkoutPlan as 'premium' | 'enterprise'} billingCycle={checkoutCycle} onBack={() => navigate('/pricing')} onComplete={handleCheckoutComplete} /></RequireAuth>} />
-              <Route path="/subscription-success" element={<RequireAuth><SubscriptionSuccess subscriptionType={checkoutPlan as 'premium' | 'enterprise'} billingCycle={checkoutCycle} onContinue={() => navigate('/dashboard')} /></RequireAuth>} />
+              <Route path="/checkout" element={<RequireAuth><Checkout subscriptionType={checkoutPlan as 'premium' | 'enterprise'} billingCycle={checkoutCycle} onBack={() => navigate('/pricing')} /></RequireAuth>} />
+              <Route path="/subscription-success" element={<RequireAuth><SubscriptionSuccess onContinue={() => navigate('/dashboard')} /></RequireAuth>} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
               <Route path="/visa/:countryCode" element={<VisaProduct />} />

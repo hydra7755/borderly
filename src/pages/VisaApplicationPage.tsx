@@ -68,7 +68,10 @@ const VisaApplicationPage: React.FC = () => {
           <p className="mt-2 text-gray-600">Complete your visa application in 5 easy steps</p>
         </div>
 
-        <VisaApplicationStepper onComplete={handleApplicationComplete} />
+        <VisaApplicationStepper
+          destinationCode={destination}
+          onComplete={handleApplicationComplete}
+        />
       </div>
     </div>
   );
