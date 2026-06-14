@@ -1,6 +1,6 @@
 # Setting Up Tesseract.js for Fallback OCR
 
-This guide explains how to set up Tesseract.js as a fallback OCR service for passport scanning in the TravelScore application.
+This guide explains how to set up Tesseract.js as a fallback OCR service for passport scanning in the Borderly application.
 
 ## Overview
 

@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 
-console.log('🔍 TravelScore OCR Setup Script');
+console.log('🔍 Borderly OCR Setup Script');
 console.log('==============================');
 
 // Function to check if a package is installed

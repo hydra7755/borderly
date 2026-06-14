@@ -8,6 +8,8 @@ import {
   useElements
 } from '@stripe/react-stripe-js';
 import visaApplicationsService from '../lib/api/visaApplications';
+import authService from '../lib/api/auth';
+import { sendVisaApplicationToCompany } from '../services/emailService';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
@@ -41,6 +43,28 @@ const SimplePaymentForm = ({ applicationId }: { applicationId?: string }) => {
 
       if (!saved || saveError) {
         throw saveError ?? new Error('Failed to record payment');
+      }
+
+      try {
+        const [{ user }, { application }] = await Promise.all([
+          authService.getCurrentUser(),
+          visaApplicationsService.getApplicationById(applicationId),
+        ]);
+
+        if (application) {
+          await sendVisaApplicationToCompany({
+            applicationId: application.id,
+            nationalityCode: application.nationality_code || 'unknown',
+            destinationCode: application.destination_code || application.destination_id,
+            userEmail: user?.email,
+            userName: user?.full_name,
+            entryDate: application.entry_date,
+            exitDate: application.exit_date,
+            paymentStatus: 'paid',
+          });
+        }
+      } catch (emailError) {
+        console.error('Failed to send payment notification email:', emailError);
       }
 
       setSuccess(true);

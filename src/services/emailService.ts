@@ -2,24 +2,20 @@ import { Resend } from 'resend';
 import { welcomeEmailTemplate } from '../email-templates/welcome';
 import { acknowledgementEmailTemplate } from '../email-templates/acknowledgement';
 import { applicationEmailTemplate } from '../email-templates/application';
+import { getCompanyEmail } from '../config/companyContact';
 
-// Initialize Resend with API key from environment variables
-const resendApiKey = 
-  (window as any)._env_?.VITE_RESEND_API_KEY || 
-  (window as any)._env_?.REACT_APP_RESEND_API_KEY || 
+const resendApiKey =
+  (window as { _env_?: Record<string, string> })._env_?.VITE_RESEND_API_KEY ||
+  (window as { _env_?: Record<string, string> })._env_?.REACT_APP_RESEND_API_KEY ||
   're_KGPqeL2n_FCuMudHh4A4bZtEmHXiQb8h1';
 
 const resend = new Resend(resendApiKey);
 
-// Get the from email from environment variables
-const fromEmail = 
-  (window as any)._env_?.VITE_EMAIL_FROM_EMAIL || 
-  (window as any)._env_?.REACT_APP_EMAIL_FROM_EMAIL || 
-  'contact@borderly.net';
+const fromEmail =
+  (window as { _env_?: Record<string, string> })._env_?.VITE_EMAIL_FROM_EMAIL ||
+  (window as { _env_?: Record<string, string> })._env_?.REACT_APP_EMAIL_FROM_EMAIL ||
+  getCompanyEmail();
 
-/**
- * Send a basic email
- */
 export async function sendEmail(to: string, subject: string, html: string) {
   try {
     const data = await resend.emails.send({
@@ -37,39 +33,80 @@ export async function sendEmail(to: string, subject: string, html: string) {
   }
 }
 
-/**
- * Send a welcome email to a new user
- */
 export async function sendWelcomeEmail(to: string, name: string = '') {
   const subject = 'Welcome to Borderly!';
   const html = welcomeEmailTemplate(name);
-  
+
   return sendEmail(to, subject, html);
 }
 
-/**
- * Send an acknowledgement email when a user contacts us
- */
 export async function sendAcknowledgementEmail(to: string, name: string = '') {
-  const subject = 'We\'ve received your message';
+  const subject = "We've received your message";
   const html = acknowledgementEmailTemplate(name);
-  
+
   return sendEmail(to, subject, html);
 }
 
-/**
- * Send an application confirmation email
- */
 export async function sendApplicationEmail(to: string, name: string = '', applicationType: string = 'visa') {
   const subject = 'Your Application Has Been Received';
   const html = applicationEmailTemplate(name, applicationType);
-  
+
   return sendEmail(to, subject, html);
 }
 
-/**
- * Send a test email to verify the email system is working
- */
+export interface ContactFormPayload {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}
+
+/** Deliver a website contact form submission to the company inbox. */
+export async function sendContactFormToCompany(payload: ContactFormPayload) {
+  const html = `
+    <h2>New Contact Form Submission</h2>
+    <p><strong>Name:</strong> ${payload.name}</p>
+    <p><strong>Email:</strong> ${payload.email}</p>
+    <p><strong>Subject:</strong> ${payload.subject}</p>
+    <p><strong>Message:</strong></p>
+    <p>${payload.message.replace(/\n/g, '<br>')}</p>
+  `;
+
+  return sendEmail(getCompanyEmail(), `New Contact Form: ${payload.subject}`, html);
+}
+
+export interface VisaApplicationNotificationPayload {
+  applicationId: string;
+  nationalityCode: string;
+  destinationCode: string;
+  userEmail?: string | null;
+  userName?: string | null;
+  entryDate?: string;
+  exitDate?: string;
+  paymentStatus?: string;
+}
+
+/** Notify the company inbox when a visa application is submitted or updated. */
+export async function sendVisaApplicationToCompany(payload: VisaApplicationNotificationPayload) {
+  const html = `
+    <h2>New Visa Application</h2>
+    <p><strong>Application ID:</strong> ${payload.applicationId}</p>
+    <p><strong>Nationality:</strong> ${payload.nationalityCode.toUpperCase()}</p>
+    <p><strong>Destination:</strong> ${payload.destinationCode.toUpperCase()}</p>
+    <p><strong>Applicant email:</strong> ${payload.userEmail || 'Not provided'}</p>
+    <p><strong>Applicant name:</strong> ${payload.userName || 'Not provided'}</p>
+    <p><strong>Entry date:</strong> ${payload.entryDate || 'Not provided'}</p>
+    <p><strong>Exit date:</strong> ${payload.exitDate || 'Not provided'}</p>
+    <p><strong>Payment status:</strong> ${payload.paymentStatus || 'pending'}</p>
+  `;
+
+  return sendEmail(
+    getCompanyEmail(),
+    `Visa Application: ${payload.nationalityCode.toUpperCase()} → ${payload.destinationCode.toUpperCase()} (${payload.applicationId})`,
+    html
+  );
+}
+
 export async function sendTestEmail(to: string) {
   const subject = 'Test Email from Borderly';
   const html = `
@@ -78,6 +115,8 @@ export async function sendTestEmail(to: string) {
     <p>If you received this email, it means the email service is configured correctly.</p>
     <p><strong>Time sent:</strong> ${new Date().toLocaleString()}</p>
   `;
-  
+
   return sendEmail(to, subject, html);
-} 
+}
+
+export { getCompanyEmail };

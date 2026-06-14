@@ -31,8 +31,10 @@ const environmentVars = {
   REACT_APP_SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
   VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || '',
   VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY || '',
-  
-  // Other environment variables can be added here
+
+  // Official company inbox (contact forms, applications)
+  VITE_CONTACT_EMAIL: process.env.VITE_CONTACT_EMAIL || process.env.REACT_APP_CONTACT_EMAIL || 'contactborderly@gmail.com',
+  REACT_APP_CONTACT_EMAIL: process.env.REACT_APP_CONTACT_EMAIL || process.env.VITE_CONTACT_EMAIL || 'contactborderly@gmail.com',
 };
 
 // Create the window._env_ content

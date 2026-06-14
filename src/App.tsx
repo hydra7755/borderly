@@ -32,6 +32,9 @@ import VisaApplicationPage from './pages/VisaApplicationPage';
 import PaymentPage from './pages/PaymentPage';
 import VisaConfirmationPage from './pages/VisaConfirmationPage';
 import ScrollToTop from './components/ScrollToTop';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import RefundPolicy from './pages/RefundPolicy';
 
 // Define types for pages
 type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'questionnaire' | 'world-map' | 'profile' | 'subscription' | 'evisa' | 
@@ -448,6 +451,9 @@ const AppContent: React.FC = () => {
                 />
               } />
               <Route path="/contact" element={<Contact />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/refunds" element={<RefundPolicy />} />
               <Route path="/evisa" element={<Navigate to="/visa-checker" replace />} />
               <Route path="/evisa/:nationality/:destination" element={
                 <RequireAuth>

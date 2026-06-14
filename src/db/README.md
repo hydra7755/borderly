@@ -1,6 +1,6 @@
 # Visa Requirements Database Setup
 
-This directory contains SQL scripts to set up the database structure for the TravelScore application.
+This directory contains SQL scripts to set up the database structure for the Borderly application.
 
 ## Setting up the Visa Requirements Table
 

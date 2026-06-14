@@ -1,6 +1,6 @@
 # Setting Up Apple OAuth with Supabase
 
-This guide provides step-by-step instructions for setting up Apple Sign-In for your TravelScore application using Supabase Authentication.
+This guide provides step-by-step instructions for setting up Apple Sign-In for your Borderly application using Supabase Authentication.
 
 ## Prerequisites
 
@@ -16,8 +16,8 @@ This guide provides step-by-step instructions for setting up Apple Sign-In for y
 4. Click the "+" button to add a new identifier
 5. Select "App IDs" and click "Continue"
 6. Fill in the following information:
-   - Description: "TravelScore"
-   - Bundle ID: Use a reverse-domain style identifier (e.g., `com.yourdomain.travelscore`)
+   - Description: "Borderly"
+   - Bundle ID: Use a reverse-domain style identifier (e.g., `com.yourdomain.borderly`)
 7. Under "Capabilities", enable "Sign In with Apple"
 8. Click "Continue" and then "Register"
 
@@ -27,8 +27,8 @@ This guide provides step-by-step instructions for setting up Apple Sign-In for y
 2. Click the "+" button to add a new identifier
 3. Select "Services IDs" and click "Continue"
 4. Fill in the following information:
-   - Description: "TravelScore Web Auth"
-   - Identifier: Create a unique identifier (e.g., `com.yourdomain.travelscore.auth`)
+   - Description: "Borderly Web Auth"
+   - Identifier: Create a unique identifier (e.g., `com.yourdomain.borderly.auth`)
 5. Click "Continue" and then "Register"
 6. Click on the newly created Services ID
 7. Enable "Sign In with Apple" and click "Configure"
@@ -49,7 +49,7 @@ This guide provides step-by-step instructions for setting up Apple Sign-In for y
 
 1. Navigate to "Keys" in the sidebar
 2. Click the "+" button to add a new key
-3. Enter a name for your key (e.g., "TravelScore Apple Auth Key")
+3. Enter a name for your key (e.g., "Borderly Apple Auth Key")
 4. Enable "Sign In with Apple" and click "Configure"
 5. Select your App ID and click "Save"
 6. Click "Continue" and then "Register"
@@ -63,7 +63,7 @@ This guide provides step-by-step instructions for setting up Apple Sign-In for y
 3. Find "Apple" in the list of providers and click on it
 4. Toggle the switch to enable Apple sign-in
 5. Fill in the following information:
-   - Service ID: The Services ID you created earlier (e.g., `com.yourdomain.travelscore.auth`)
+   - Service ID: The Services ID you created earlier (e.g., `com.yourdomain.borderly.auth`)
    - Team ID: Your Apple Developer Team ID (found in the Developer Portal under "Membership")
    - Key ID: The ID of the key you created
    - Private Key: Copy and paste the contents of the .p8 file you downloaded

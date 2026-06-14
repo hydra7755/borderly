@@ -1,8 +1,12 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
-  
+
+  const linkClass =
+    'text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500';
+
   return (
     <footer className="bg-gray-50 border-t border-gray-200 dark:bg-gray-900 dark:border-gray-800">
       <div className="container mx-auto px-4 py-12">
@@ -19,7 +23,7 @@ export const Footer: React.FC = () => {
               Unlock your global mobility potential with Borderly - the smarter way to understand and improve your passport strength.
             </p>
           </div>
-          
+
           {/* Navigation */}
           <div className="col-span-1">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-4">
@@ -27,57 +31,57 @@ export const Footer: React.FC = () => {
             </h3>
             <ul className="space-y-2">
               <li>
-                <a href="/" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                <Link to="/" className={linkClass}>
                   Home
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/features" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                <Link to="/features" className={linkClass}>
                   Features
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/pricing" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                <Link to="/pricing" className={linkClass}>
                   Pricing
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/contact" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                <Link to="/contact" className={linkClass}>
                   Contact
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
-          
-          {/* Blogs Section - New */}
+
+          {/* Blogs Section */}
           <div className="col-span-1">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-4">
               Travel Blogs
             </h3>
             <ul className="space-y-2">
               <li>
-                <a href="/blogs" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                <Link to="/blogs" className={linkClass}>
                   All Blogs
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/blogs/category/visa-tips" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                <Link to="/blogs/category/visa-tips" className={linkClass}>
                   Visa Tips
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/blogs/category/destinations" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                <Link to="/blogs/category/destinations" className={linkClass}>
                   Top Destinations
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/blogs/category/travel-guides" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                <Link to="/blogs/category/travel-guides" className={linkClass}>
                   Travel Guides
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
-          
+
           {/* Legal */}
           <div className="col-span-1">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-4">
@@ -85,23 +89,23 @@ export const Footer: React.FC = () => {
             </h3>
             <ul className="space-y-2">
               <li>
-                <a href="/privacy" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                <Link to="/privacy" className={linkClass}>
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/terms" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
+                <Link to="/terms" className={linkClass}>
                   Terms of Service
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/cookie-policy" className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-500">
-                  Cookie Policy
-                </a>
+                <Link to="/refunds" className={linkClass}>
+                  Refund &amp; Cancellation Policy
+                </Link>
               </li>
             </ul>
           </div>
-          
+
           {/* Contact */}
           <div className="col-span-1">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider mb-4">
@@ -110,22 +114,40 @@ export const Footer: React.FC = () => {
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               Have questions or feedback? Get in touch with our team.
             </p>
-            <a 
-              href="/contact" 
+            <Link
+              to="/contact"
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               Contact Us
-            </a>
+            </Link>
           </div>
         </div>
-        
-        <div className="border-t border-gray-200 dark:border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-gray-500 dark:text-gray-400 text-sm">
-            © {currentYear} TravelScore. All rights reserved.
-          </p>
-          
+
+        <div className="border-t border-gray-200 dark:border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-center sm:text-left">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              © {currentYear} Borderly. All rights reserved.
+            </p>
+            <nav
+              className="flex flex-wrap justify-center sm:justify-start items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400"
+              aria-label="Legal links"
+            >
+              <Link to="/privacy" className="hover:text-primary-600 dark:hover:text-primary-400">
+                Privacy Policy
+              </Link>
+              <span aria-hidden="true">·</span>
+              <Link to="/terms" className="hover:text-primary-600 dark:hover:text-primary-400">
+                Terms of Service
+              </Link>
+              <span aria-hidden="true">·</span>
+              <Link to="/refunds" className="hover:text-primary-600 dark:hover:text-primary-400">
+                Refunds &amp; Cancellations
+              </Link>
+            </nav>
+          </div>
+
           {/* Social Links */}
-          <div className="flex space-x-6 mt-4 md:mt-0">
+          <div className="flex space-x-6">
             <a href="#" className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
               <span className="sr-only">Facebook</span>
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -149,4 +171,4 @@ export const Footer: React.FC = () => {
       </div>
     </footer>
   );
-}; 
+};

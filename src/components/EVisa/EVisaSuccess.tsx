@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircleIcon, EnvelopeIcon, PrinterIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { getCompanyEmail } from '../../config/companyContact';
 
 // Define application data type
 type ApplicationData = {
@@ -19,6 +20,8 @@ interface EVisaSuccessProps {
 }
 
 const EVisaSuccess: React.FC<EVisaSuccessProps> = ({ data, onFinish }) => {
+  const companyEmail = getCompanyEmail();
+
   // Estimated date of visa approval (7 days from now)
   const getEstimatedDate = () => {
     const date = new Date();
@@ -147,8 +150,8 @@ const EVisaSuccess: React.FC<EVisaSuccessProps> = ({ data, onFinish }) => {
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
             Need help? Contact our support team:
           </p>
-          <a href="mailto:support@travelscore.com" className="text-sm text-primary-600 hover:text-primary-500">
-            support@travelscore.com
+          <a href={`mailto:${companyEmail}`} className="text-sm text-primary-600 hover:text-primary-500">
+            {companyEmail}
           </a>
         </div>
       </div>

@@ -499,13 +499,13 @@ const TripsManager: React.FC<TripsManagerProps> = ({ isLoggedIn, onLoginRequired
               Impact on Your Travel Score
             </h2>
             <p className="text-primary-600 dark:text-primary-400 mb-4">
-              Recording your trips helps boost your TravelScore! Each new country you visit adds points to your travel experience component.
+              Recording your trips helps boost your Borderly travel score! Each new country you visit adds points to your travel experience component.
             </p>
             <button 
               onClick={() => window.location.href = '/travel-score'}
               className="text-primary-700 dark:text-primary-300 font-medium hover:underline flex items-center"
             >
-              View your TravelScore details
+              View your travel score details
               <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>

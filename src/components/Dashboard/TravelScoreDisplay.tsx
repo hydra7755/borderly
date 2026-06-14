@@ -26,7 +26,7 @@ const TravelScoreDisplay: React.FC<TravelScoreDisplayProps> = ({
   
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 ${className}`}>
-      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Your TravelScore</h3>
+      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Your Travel Score</h3>
       
       <div className="flex items-center justify-center mb-6">
         <motion.div 

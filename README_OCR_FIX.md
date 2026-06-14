@@ -1,6 +1,6 @@
 # OCR Issues Fix Guide
 
-This guide will help you resolve issues with the OCR service in the TravelScore application.
+This guide will help you resolve issues with the OCR service in the Borderly application.
 
 ## Common Error: "OCR service unavailable. Unable to process passport image."
 

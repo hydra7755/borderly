@@ -12,7 +12,7 @@ interface ChatBubbleProps {
   onLoginRequired: () => void;
 }
 
-const WELCOME_MESSAGE = `Hi! I'm your TravelScore AI Assistant. I can help with visa requirements, travel plans, and more. How can I help you today?`;
+const WELCOME_MESSAGE = `Hi! I'm your Borderly AI Assistant. I can help with visa requirements, travel plans, and more. How can I help you today?`;
 
 const ERROR_MESSAGES = {
   network: 'Unable to connect to the AI service. Please check your internet connection and try again.',
@@ -23,8 +23,8 @@ const ERROR_MESSAGES = {
 
 // Add link processing function
 const processLinks = (text: string): React.ReactNode => {
-  // Pattern to match visa application links like TravelScore.com/visa/[country]
-  const visaLinkPattern = /\[TravelScore\.com\/visa\/([a-z]+)\]|\(https:\/\/travelscore\.com\/visa\/([a-z]+)\)/gi;
+  // Pattern to match visa application links like borderly.net/visa/[country]
+  const visaLinkPattern = /\[Borderly\.net\/visa\/([a-z]+)\]|\(https:\/\/borderly\.net\/visa\/([a-z]+)\)/gi;
   
   // Pattern to match explicit visa mentions like "apply for a [country] visa"
   const visaMentionPattern = /apply for an? ([a-z]+) visa|check ([a-z]+) visa requirements|([a-z]+) visa application/gi;

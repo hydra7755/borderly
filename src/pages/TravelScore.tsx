@@ -116,7 +116,7 @@ const TravelScore: React.FC<TravelScoreProps> = ({ isLoggedIn, onLoginRequired }
       <header className="bg-teal-700 text-white p-4">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <span className="text-xl font-bold">TravelScore Pro</span>
+            <span className="text-xl font-bold">Borderly Pro</span>
           </div>
           <nav className="flex items-center gap-4">
             <a href="/dashboard" className="flex items-center gap-2 text-white">

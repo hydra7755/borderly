@@ -1,4 +1,4 @@
--- Setup script for TravelScore database
+-- Setup script for Borderly database
 -- Run this in your Supabase SQL Editor
 
 -- Enable UUID extension

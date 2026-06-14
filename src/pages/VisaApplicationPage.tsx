@@ -2,6 +2,11 @@ import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import VisaApplicationStepper from '../components/EVisa/VisaApplicationStepper';
 import visaApplicationsService from '../lib/api/visaApplications';
+import authService from '../lib/api/auth';
+import {
+  sendApplicationEmail,
+  sendVisaApplicationToCompany,
+} from '../services/emailService';
 
 const VisaApplicationPage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +35,26 @@ const VisaApplicationPage: React.FC = () => {
       console.error('Failed to save visa application:', error);
       alert('Your application could not be saved. Please try again.');
       return;
+    }
+
+    try {
+      const { user } = await authService.getCurrentUser();
+      await sendVisaApplicationToCompany({
+        applicationId: application.id,
+        nationalityCode: nationality,
+        destinationCode: destination,
+        userEmail: user?.email,
+        userName: user?.full_name || user?.email?.split('@')[0],
+        entryDate: data.travelDates?.arrival,
+        exitDate: data.travelDates?.departure,
+        paymentStatus: 'pending',
+      });
+
+      if (user?.email) {
+        await sendApplicationEmail(user.email, user.full_name || 'there', 'visa');
+      }
+    } catch (emailError) {
+      console.error('Failed to send application notification emails:', emailError);
     }
 
     navigate(`/payment/${application.id}`);

@@ -1,11 +1,11 @@
-# Google Cloud Vision API Integration Guide for TravelScore
+# Google Cloud Vision API Integration Guide for Borderly
 
-This guide will walk you through the process of setting up and integrating Google Cloud Vision API for passport OCR in the TravelScore application.
+This guide will walk you through the process of setting up and integrating Google Cloud Vision API for passport OCR in the Borderly application.
 
 ## Prerequisites
 
 - Google Cloud Platform account
-- TravelScore application codebase
+- Borderly application codebase
 - Node.js and npm installed
 - Basic understanding of React and TypeScript
 
@@ -31,7 +31,7 @@ This guide will walk you through the process of setting up and integrating Googl
 
 ## Step 4: Configure Environment Variables
 
-Add the following environment variables to your TravelScore application:
+Add the following environment variables to your Borderly application:
 
 1. Create or update the `.env` file in the root of your project:
 
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS user_documents (
 
 ## Step 6: Test the Integration
 
-1. Start your TravelScore application
+1. Start your Borderly application
 2. Navigate to the passport scan feature
 3. Upload a passport image
 4. Check the console logs to verify that Google Cloud Vision API is being used

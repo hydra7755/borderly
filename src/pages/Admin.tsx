@@ -269,7 +269,7 @@ const AdminDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-teal-700 text-white p-4">
         <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold">TravelScore Admin</h1>
+          <h1 className="text-2xl font-bold">Borderly Admin</h1>
           <nav>
             <Link to="/dashboard" className="text-white hover:text-teal-200 ml-4">
               Back to Dashboard

@@ -1,10 +1,10 @@
 # OCR Services Setup Guide
 
-This guide explains how to properly set up and configure the OCR services for the TravelScore application.
+This guide explains how to properly set up and configure the OCR services for the Borderly application.
 
 ## Overview
 
-The TravelScore application uses a tiered approach to OCR (Optical Character Recognition) for passport scanning:
+The Borderly application uses a tiered approach to OCR (Optical Character Recognition) for passport scanning:
 
 1. **Google Cloud Vision API** (Primary service)
 2. **Local OCR Server** (Secondary service)

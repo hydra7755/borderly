@@ -173,7 +173,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentTab }) => {
         transition={{ delay: 1 }}
       >
         <div className="flex items-center justify-between text-sm text-gray-500">
-          <span>© TravelScore</span>
+          <span>© Borderly</span>
           <span>v1.0.0</span>
         </div>
       </motion.div>

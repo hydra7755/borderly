@@ -1,6 +1,6 @@
-# TravelScore - Global Mobility Index
+# Borderly - Global Mobility Index
 
-TravelScore is a comprehensive web application that helps users understand and improve their global mobility potential by calculating a travel score based on passport strength, travel history, and residency benefits.
+Borderly is a comprehensive web application that helps users understand and improve their global mobility potential by calculating a travel score based on passport strength, travel history, and residency benefits.
 
 ## Features
 
@@ -31,8 +31,8 @@ TravelScore is a comprehensive web application that helps users understand and i
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/travelscore.git
-   cd travelscore
+   git clone https://github.com/hydra7755/borderly.git
+   cd borderly
    ```
 
 2. Install dependencies:
@@ -45,7 +45,7 @@ TravelScore is a comprehensive web application that helps users understand and i
    ```
    VITE_SUPABASE_URL=your_supabase_url
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   VITE_CONTACT_EMAIL=contact@travelscore.com
+   VITE_CONTACT_EMAIL=contactborderly@gmail.com
    VITE_STRIPE_PUBLIC_KEY=your_stripe_public_key
    
    # Optional OCR Configuration

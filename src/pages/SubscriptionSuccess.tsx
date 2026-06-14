@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { getCompanyEmail } from '../config/companyContact';
 
 interface SubscriptionSuccessProps {
   subscriptionType: 'premium' | 'enterprise';
@@ -12,6 +13,8 @@ const SubscriptionSuccess: React.FC<SubscriptionSuccessProps> = ({
   billingCycle,
   onContinue
 }) => {
+  const companyEmail = getCompanyEmail();
+
   // Format subscription details for display
   const getSubscriptionDetails = () => {
     const plan = subscriptionType.charAt(0).toUpperCase() + subscriptionType.slice(1);
@@ -141,8 +144,8 @@ const SubscriptionSuccess: React.FC<SubscriptionSuccessProps> = ({
         <div className="text-center text-sm text-gray-500 dark:text-gray-400">
           <p>
             If you have any questions, please contact our support team at <br />
-            <a href="mailto:support@travelwithydra.com" className="text-primary-600 hover:underline">
-              support@travelwithydra.com
+            <a href={`mailto:${companyEmail}`} className="text-primary-600 hover:underline">
+              {companyEmail}
             </a>
           </p>
         </div>

@@ -21,7 +21,7 @@ export async function handleAIAssistantRequest(message: string, conversationHist
     // Prepare messages with context from conversation history
     const systemMessage: Message = {
       role: 'system',
-      content: `You are a concise travel and visa assistant for the TravelScore website, a platform that helps travelers with visa applications, travel planning, and more.
+      content: `You are a concise travel and visa assistant for the Borderly website (borderly.net), a platform that helps travelers with visa applications, travel planning, and more.
 
 IMPORTANT GUIDELINES:
 1. Be extremely concise in your responses. Keep them under 3 sentences when possible.
@@ -69,7 +69,7 @@ Always prefer guiding users toward using our website's services.`
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${DEEPSEEK_API_KEY.trim()}`, // Ensure no whitespace
         'Accept': 'application/json',
-        'User-Agent': 'TravelScore/1.0',
+        'User-Agent': 'Borderly/1.0',
       },
       body: JSON.stringify({
         model: 'deepseek-chat',

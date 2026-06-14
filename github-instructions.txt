@@ -1,15 +1,15 @@
-How to Push Your TravelScore Project to GitHub
+How to Push Your Borderly Project to GitHub
 ===========================================
 
 1. Create a new GitHub repository:
    - Go to https://github.com/new in your browser
-   - Name it 'travelscore' 
+   - Name it 'borderly' 
    - Add an optional description
    - Choose public or private visibility
    - Do NOT initialize with README, .gitignore, or license
 
 2. Copy the repository URL shown after creation
-   It should look like: https://github.com/yourusername/travelscore.git
+   It should look like: https://github.com/yourusername/borderly.git
 
 3. Open a terminal in your project folder and run these commands:
    ```

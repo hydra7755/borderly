@@ -1,4 +1,4 @@
--- Create tables for the TravelScore application
+-- Create tables for the Borderly application
 
 -- Users table
 CREATE TABLE users (

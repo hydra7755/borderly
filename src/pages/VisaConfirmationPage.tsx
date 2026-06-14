@@ -3,12 +3,14 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase/client';
 import { FaCheckCircle, FaDownload, FaEnvelope } from 'react-icons/fa';
+import { getCompanyEmail } from '../config/companyContact';
 
 interface VisaConfirmationPageProps {
   isLoggedIn?: boolean;
 }
 
 const VisaConfirmationPage: React.FC<VisaConfirmationPageProps> = ({ isLoggedIn }) => {
+  const companyEmail = getCompanyEmail();
   const { applicationId } = useParams<{ applicationId: string }>();
   const navigate = useNavigate();
   
@@ -264,10 +266,10 @@ const VisaConfirmationPage: React.FC<VisaConfirmationPageProps> = ({ isLoggedIn 
                   Questions about your application?
                 </p>
                 <a 
-                  href="mailto:support@travelscore.com" 
+                  href={`mailto:${companyEmail}`}
                   className="text-blue-600 hover:underline flex items-center"
                 >
-                  <FaEnvelope className="mr-1" /> Contact Support
+                  <FaEnvelope className="mr-1" /> {companyEmail}
                 </a>
               </div>
               

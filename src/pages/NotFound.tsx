@@ -1,11 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { getCompanyEmail } from '../config/companyContact';
 
 interface NotFoundProps {
   onGoHome: () => void;
 }
 
 const NotFound: React.FC<NotFoundProps> = ({ onGoHome }) => {
+  const companyEmail = getCompanyEmail();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <motion.div
@@ -42,7 +45,7 @@ const NotFound: React.FC<NotFoundProps> = ({ onGoHome }) => {
             Go back home
           </button>
           <a
-            href="mailto:support@travelscore.com"
+            href={`mailto:${companyEmail}`}
             className="ml-3 inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 shadow-sm text-base font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             Contact support
