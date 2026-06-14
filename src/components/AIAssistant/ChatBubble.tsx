@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { handleAIAssistantRequest } from '../../api/ai-assistant';
+import { userProfileService } from '../../lib/api/userProfile';
+import {
+  canSendAiMessage,
+  getAiAssistantLimits,
+  getRemainingAiMessages,
+  incrementAiDailyUsage,
+} from '../../config/aiAssistantAccess';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -182,7 +190,26 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ isLoggedIn, onLoginRequired }) 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [subscriptionTier, setSubscriptionTier] = useState<string>('free');
+  const [remainingMessages, setRemainingMessages] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const aiLimits = getAiAssistantLimits(subscriptionTier);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const { profile } = await userProfileService.getCurrentUserProfile();
+        const tier = profile?.subscription_tier || 'free';
+        setSubscriptionTier(tier);
+        setRemainingMessages(getRemainingAiMessages(tier));
+      } catch {
+        setSubscriptionTier('free');
+        setRemainingMessages(0);
+      }
+    };
+    if (isLoggedIn) loadProfile();
+  }, [isLoggedIn]);
 
   // Save state to localStorage when it changes
   useEffect(() => {
@@ -222,6 +249,19 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ isLoggedIn, onLoginRequired }) 
       return;
     }
 
+    if (!canSendAiMessage(subscriptionTier)) {
+      const upgradeMsg = aiLimits.hasAccess
+        ? "You've reached today's AI message limit. Try again tomorrow or upgrade to Enterprise for unlimited access."
+        : 'AI Assistant is included with Premium and Enterprise plans.';
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user' as const, content: inputValue.trim() },
+        { role: 'assistant' as const, content: upgradeMsg },
+      ]);
+      setInputValue('');
+      return;
+    }
+
     setError(null);
     const userMessage = inputValue.trim();
     const userMessageObj = { role: 'user' as const, content: userMessage };
@@ -238,8 +278,15 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ isLoggedIn, onLoginRequired }) 
 
     try {
       console.log('Sending message to AI with conversation history:', updatedHistory);
-      const { response } = await handleAIAssistantRequest(userMessage, updatedHistory);
+      const { response } = await handleAIAssistantRequest(
+        userMessage,
+        updatedHistory,
+        subscriptionTier
+      );
       console.log('Received AI response:', response);
+
+      incrementAiDailyUsage();
+      setRemainingMessages(getRemainingAiMessages(subscriptionTier));
       
       const assistantMessage = { role: 'assistant' as const, content: response };
       setMessages(prev => [...prev, assistantMessage]);
@@ -340,7 +387,11 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ isLoggedIn, onLoginRequired }) 
                   AI Travel Assistant
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Ask me anything about travel and visas!
+                  {aiLimits.hasAccess
+                    ? Number.isFinite(remainingMessages)
+                      ? `${remainingMessages} messages left today`
+                      : 'Unlimited messages'
+                    : 'Premium feature — upgrade to chat'}
                 </p>
               </div>
               <button 
@@ -353,6 +404,16 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ isLoggedIn, onLoginRequired }) 
                 </svg>
               </button>
             </div>
+
+            {!aiLimits.hasAccess && (
+              <div className="mx-4 mt-3 p-3 bg-primary-50 border border-primary-100 rounded-lg text-sm text-primary-800">
+                Upgrade to{' '}
+                <Link to="/pricing" className="font-semibold underline">
+                  Premium
+                </Link>{' '}
+                to use Gemini-powered travel & visa help.
+              </div>
+            )}
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -408,13 +469,15 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ isLoggedIn, onLoginRequired }) 
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Type your question..."
+                  placeholder={
+                    aiLimits.hasAccess ? 'Type your question...' : 'Upgrade to Premium to chat'
+                  }
                   className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
-                  disabled={isLoading}
+                  disabled={isLoading || !aiLimits.hasAccess}
                 />
                 <button
                   type="submit"
-                  disabled={!inputValue.trim() || isLoading}
+                  disabled={!inputValue.trim() || isLoading || !aiLimits.hasAccess}
                   className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Send

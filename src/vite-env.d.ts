@@ -8,7 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_EMAIL_USER_ID: string;
   readonly VITE_CONTACT_EMAIL: string;
   readonly VITE_STRIPE_PUBLIC_KEY: string;
-  readonly VITE_DEEPSEEK_API_KEY: string;
+  readonly NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: string;
 }
 
 interface ImportMeta {
