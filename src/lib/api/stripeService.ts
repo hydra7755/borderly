@@ -1,20 +1,7 @@
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import authService from './auth';
 import { SubscriptionType, BillingCycle } from '../../config/stripePricing';
-
-declare global {
-  interface Window {
-    _env_?: Record<string, string>;
-  }
-}
-
-function getStripePublishableKey(): string {
-  return (
-    import.meta.env.VITE_STRIPE_PUBLIC_KEY ||
-    (typeof window !== 'undefined' ? window._env_?.VITE_STRIPE_PUBLIC_KEY : '') ||
-    ''
-  );
-}
+import { getStripePublishableKey } from '../../config/stripeEnv';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 

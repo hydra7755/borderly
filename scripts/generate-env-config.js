@@ -7,6 +7,12 @@ import dotenv from 'dotenv';
 // Load environment variables from .env file
 dotenv.config();
 
+const stripePublishableKey =
+  process.env.VITE_STRIPE_PUBLIC_KEY ||
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
+  process.env.REACT_APP_STRIPE_PUBLIC_KEY ||
+  '';
+
 // Get the directory name in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,8 +43,9 @@ const environmentVars = {
   REACT_APP_CONTACT_EMAIL: process.env.REACT_APP_CONTACT_EMAIL || process.env.VITE_CONTACT_EMAIL || 'contactborderly@gmail.com',
 
   // Stripe publishable key (safe for browser)
-  VITE_STRIPE_PUBLIC_KEY: process.env.VITE_STRIPE_PUBLIC_KEY || process.env.REACT_APP_STRIPE_PUBLIC_KEY || '',
-  REACT_APP_STRIPE_PUBLIC_KEY: process.env.REACT_APP_STRIPE_PUBLIC_KEY || process.env.VITE_STRIPE_PUBLIC_KEY || '',
+  VITE_STRIPE_PUBLIC_KEY: stripePublishableKey,
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: stripePublishableKey,
+  REACT_APP_STRIPE_PUBLIC_KEY: stripePublishableKey,
 };
 
 // Create the window._env_ content
