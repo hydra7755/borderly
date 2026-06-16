@@ -2,6 +2,9 @@ import { ALL_COUNTRIES } from './countries';
 import { VisaProduct, generateStandardFAQs, generateCloudinaryUrls } from '../types/visaProduct';
 import { getCountryNameFromCode } from '../lib/api/visaRequirements';
 import { getVisaFeeForCountry } from '../data/visaFees';
+import { isSchengenCountry } from './schengenCountries';
+import { isUnitedStates } from './unitedStatesVisa';
+import { SCHENGEN_REQUIRED_DOCUMENTS } from '../config/schengenPricing';
 
 /**
  * Generate visa product data for a specific country
@@ -63,6 +66,8 @@ export const generateVisaProductForCountry = (
 
   // Default visa type if not specified in the map above
   let visaType: VisaProduct['visaType'] = visaTypes[country.name] || 'visa-required';
+  const schengen = isSchengenCountry(country.code);
+  const us = isUnitedStates(country.code);
   
   // Determine length of stay based on visa type
   let lengthOfStay = '';
@@ -80,7 +85,11 @@ export const generateVisaProductForCountry = (
       lengthOfStay = '90 days';
       break;
     case 'visa-required':
-      lengthOfStay = 'Varies';
+      lengthOfStay = schengen
+        ? "Visa officer's decision (7 days to 1 year)"
+        : us
+          ? '90 days'
+          : 'Varies';
       break;
   }
 
@@ -100,7 +109,11 @@ export const generateVisaProductForCountry = (
       visaValidity = '1 year from issue';
       break;
     case 'visa-required':
-      visaValidity = '90 days from issue';
+      visaValidity = schengen
+        ? "Visa officer's decision (up to 1 year typical)"
+        : us
+          ? 'As per visa type'
+          : '90 days from issue';
       break;
     default:
       visaValidity = 'Varies';
@@ -111,14 +124,21 @@ export const generateVisaProductForCountry = (
   let entryType: VisaProduct['entryType'] = 'single';
   if (['visa-free', 'eta'].includes(visaType)) {
     entryType = 'multiple';
+  } else if (schengen || us) {
+    entryType = 'multiple';
   }
 
   // Generate processing time based on visa type
   const processingTime = {
-    normal: visaType === 'visa-required' ? '10-15 business days' : 
+    normal: us ? '15-20 business days' :
+            schengen ? 'At least 15 working days' :
+            visaType === 'visa-required' ? '10-15 business days' : 
             visaType === 'evisa' ? '3-5 business days' : 
             visaType === 'eta' ? '24-48 hours' : 'Immediate',
-    express: visaType !== 'visa-free' ? '1-2 business days' : undefined
+    express: schengen ? undefined :
+             us ? undefined :
+             visaType === 'evisa' ? '1 business day (add-on)' :
+             visaType !== 'visa-free' ? '1-2 business days' : undefined
   };
 
   // Generate FAQs based on country and visa type
@@ -152,7 +172,17 @@ export const generateVisaProductForCountry = (
       break;
   }
 
-  const visaPrice = getVisaFeeForCountry(country.name);
+  const visaPrice = schengen ? 0 : getVisaFeeForCountry(country.name);
+
+  const schengenDocuments = schengen
+    ? [
+        'Valid passport (6+ months validity)',
+        'Passport-sized photograph',
+        ...SCHENGEN_REQUIRED_DOCUMENTS.map((doc) => doc.name),
+        'Proof of sufficient funds',
+        'Completed Schengen application form',
+      ]
+    : [];
 
   // Generate a product object with all required properties
   const product: VisaProduct = {
@@ -183,14 +213,17 @@ export const generateVisaProductForCountry = (
       visaType === 'visa-required' ? 'Return ticket' : '',
       visaType === 'visa-required' ? 'Travel insurance' : '',
     ].filter(Boolean),
-    documents: [
+    documents: schengen
+      ? schengenDocuments
+      : [
       'Passport',
       visaType !== 'visa-free' ? 'Passport-sized photograph' : '',
       visaType === 'visa-required' ? 'Travel itinerary' : '',
       visaType === 'visa-required' ? 'Hotel reservations' : '',
       visaType === 'visa-required' ? 'Bank statements' : '',
       visaType === 'visa-required' ? 'Travel insurance certificate' : '',
-    ].filter(Boolean)
+    ].filter(Boolean),
+    documentsRequired: schengen ? SCHENGEN_REQUIRED_DOCUMENTS : undefined,
   } as VisaProduct;
 };
 

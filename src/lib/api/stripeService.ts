@@ -81,6 +81,35 @@ class StripeService {
     return getJson('get-checkout-session', { session_id: sessionId });
   }
 
+  async syncSubscriptionByEmail(email: string): Promise<{
+    active: boolean;
+    tier: string | null;
+    billingCycle: string | null;
+    customerId?: string | null;
+    subscriptionId?: string | null;
+    periodEnd?: number | null;
+    cancelAtPeriodEnd?: boolean;
+    isLifetime?: boolean;
+  }> {
+    return postJson('sync-subscription', { email });
+  }
+
+  async cancelSubscription(email: string): Promise<{
+    success: boolean;
+    message: string;
+    periodEnd?: number | null;
+    cancelAtPeriodEnd?: boolean;
+  }> {
+    return postJson('cancel-subscription', { email });
+  }
+
+  async createBillingPortalSession(
+    email: string,
+    returnUrl: string
+  ): Promise<{ url: string }> {
+    return postJson('create-billing-portal', { email, returnUrl });
+  }
+
   isConfigured(): boolean {
     return Boolean(getStripePublishableKey());
   }

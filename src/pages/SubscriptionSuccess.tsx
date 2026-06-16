@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { getCompanyEmail } from '../config/companyContact';
 import { stripeService } from '../lib/api/stripeService';
-import userProfileService from '../lib/api/userProfile';
+import userProfileService, { savePaidSubscriptionRecord } from '../lib/api/userProfile';
+import authService from '../lib/api/auth';
 import { SubscriptionType, BillingCycle } from '../config/stripePricing';
 
 interface SubscriptionSuccessProps {
@@ -60,6 +61,15 @@ const SubscriptionSuccess: React.FC<SubscriptionSuccessProps> = ({ onContinue })
         await userProfileService.updateProfile({
           subscription_tier: tier,
         });
+        savePaidSubscriptionRecord(tier, sessionId, {
+          billingCycle: cycle,
+          isLifetime: cycle === 'lifetime',
+        });
+
+        const { user } = await authService.getCurrentUser();
+        if (user?.id) {
+          await userProfileService.syncSubscriptionFromStripe(user.email, user.id);
+        }
       } catch (err) {
         console.error('Subscription verification error:', err);
         setVerifyError(

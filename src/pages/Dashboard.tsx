@@ -10,7 +10,11 @@ import { VisaRequirement } from '../types/visa'; // Import from visa.ts
 import { getCountryName } from '../data/countryCodes';
 import SavedCountries from '../components/Dashboard/SavedCountries';
 import useMapLoader from '../hooks/useMapLoader';
-import userProfileService, { UserProfile } from '../lib/api/userProfile';
+import userProfileService, {
+  UserProfile,
+  normalizeSubscriptionTier,
+  SubscriptionDetails,
+} from '../lib/api/userProfile';
 import documentService from '../lib/api/documentService';
 import authService from '../lib/api/auth';
 import visaApplicationsService from '../lib/api/visaApplications';
@@ -20,6 +24,46 @@ import VisaApplications from '../components/Dashboard/VisaApplications';
 import { VisaApplication } from '../types/visa';
 import { visaRequirementsService } from '../services/visaRequirementsService';
 import type { PassportMobilityStats } from '../services/visaCsvData';
+import {
+  getFlagUrl,
+  getAlternativeFlagUrl,
+  getFlagEmoji,
+  resolveCountryFlagCode,
+} from '../utils/countries';
+
+const CountryFlagImage: React.FC<{ countryValue: string; alt: string }> = ({ countryValue, alt }) => {
+  const [fallbackStage, setFallbackStage] = React.useState(0);
+  const code = resolveCountryFlagCode(countryValue);
+
+  if (!code) {
+    return (
+      <div className="w-8 h-6 mr-2 rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs text-gray-500">
+        —
+      </div>
+    );
+  }
+
+  if (fallbackStage >= 2) {
+    return (
+      <div className="w-8 h-6 mr-2 rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs font-medium">
+        {getFlagEmoji(code) || code.toUpperCase()}
+      </div>
+    );
+  }
+
+  const src = fallbackStage === 0 ? getFlagUrl(code, 80) : getAlternativeFlagUrl(code);
+
+  return (
+    <div className="w-8 h-6 mr-2 overflow-hidden rounded shadow">
+      <img
+        src={src}
+        alt={alt}
+        className="w-full h-full object-cover"
+        onError={() => setFallbackStage((stage) => stage + 1)}
+      />
+    </div>
+  );
+};
 
 interface DashboardProps {
   isLoggedIn?: boolean;
@@ -235,6 +279,8 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
   const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
+  const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null);
+  const [isManagingSubscription, setIsManagingSubscription] = useState<boolean>(false);
   
   // Correctly typed extended profile state
   const [currentProfile, setCurrentProfile] = useState<ExtendedUserProfile | null>(null);
@@ -337,6 +383,34 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
   useEffect(() => {
     loadUserData();
   }, [reloadKey]); // Include reloadKey to trigger reload when needed
+
+  useEffect(() => {
+    const handleSubscriptionUpdated = () => {
+      loadUserData();
+    };
+    window.addEventListener('borderly:subscription-updated', handleSubscriptionUpdated);
+    return () => window.removeEventListener('borderly:subscription-updated', handleSubscriptionUpdated);
+  }, [reloadKey]);
+
+  useEffect(() => {
+    if (activeTab !== 'settings' || !userData?.email || !userData?.id) return;
+
+    let cancelled = false;
+    userProfileService
+      .refreshSubscriptionDetails(userData.email, userData.id)
+      .then((details) => {
+        if (!cancelled && details) {
+          setSubscriptionDetails(details);
+        }
+      })
+      .catch((error) => {
+        console.warn('Could not refresh subscription details:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, userData?.email, userData?.id, reloadKey]);
 
   // Use basic map if there's an error loading the map or if user toggles it
   useEffect(() => {
@@ -775,20 +849,17 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
 
     const renderCountryField = (label: string, value: string) => {
       const hasValue = Boolean(value?.trim());
-      const displayName = hasValue ? getCountryName(value) || value : 'Not set';
+      const flagCode = resolveCountryFlagCode(value);
+      const displayName = hasValue
+        ? (flagCode ? getCountryName(flagCode) : getCountryName(value)) || value
+        : 'Not set';
 
       return (
         <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex-1">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</h3>
           <div className="flex items-center">
             {hasValue ? (
-              <div className="w-8 h-6 mr-2 overflow-hidden rounded shadow">
-                <img
-                  src={`/images/country-flags-main/svg/${value.toLowerCase()}.svg`}
-                  alt={`${displayName} flag`}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+              <CountryFlagImage countryValue={value} alt={`${displayName} flag`} />
             ) : (
               <div className="w-8 h-6 mr-2 rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs text-gray-500">
                 —
@@ -983,9 +1054,51 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
     );
   };
 
+  const renderMembershipBanner = () => {
+    const tier = normalizeSubscriptionTier(userData?.subscription_tier);
+    const label = tier.charAt(0).toUpperCase() + tier.slice(1);
+
+    return (
+      <div
+        className={`mb-6 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${
+          tier === 'free'
+            ? 'border-gray-200 bg-white'
+            : tier === 'enterprise'
+              ? 'border-primary-300 bg-gradient-to-r from-primary-50 to-white'
+              : 'border-primary-200 bg-gradient-to-r from-primary-50/80 to-white'
+        }`}
+      >
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Your membership</p>
+          <p className="text-lg font-bold text-gray-900">
+            {tier === 'free' ? 'Free plan' : `${label} member`}
+          </p>
+          <p className="text-sm text-gray-600">
+            {tier === 'free'
+              ? 'Upgrade to unlock AI assistant, travel alerts, and eVisa discounts.'
+              : tier === 'enterprise'
+                ? 'Unlimited AI assistant, dedicated support, and maximum eVisa discounts.'
+                : 'AI assistant, priority support, and eVisa fee discounts are active on your account.'}
+          </p>
+        </div>
+        {tier === 'free' ? (
+          <Link to="/pricing" className="btn-primary px-5 py-2 text-center text-sm font-semibold">
+            Upgrade plan
+          </Link>
+        ) : (
+          <span className="inline-flex items-center rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white">
+            Active
+          </span>
+        )}
+      </div>
+    );
+  };
+
   // Update the renderOverview function to include the new recommended destinations
   const renderOverview = () => (
     <div className="space-y-8">
+      {renderMembershipBanner()}
+      {renderUpgradeSection()}
       {/* Travel Score Overview Card */}
       <div className="card bg-white shadow-sm rounded-lg overflow-hidden">
         <div className="p-4 sm:p-6">
@@ -1466,7 +1579,8 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
   );
 
   const renderUpgradeSection = () => {
-    if (userData?.subscription_tier === 'enterprise' || !showUpgradeBanner) return null;
+    const tier = normalizeSubscriptionTier(userData?.subscription_tier);
+    if (tier !== 'free' || !showUpgradeBanner) return null;
 
     return (
       <motion.div 
@@ -1587,6 +1701,53 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
     }
   };
 
+  const formatSubscriptionDate = (unixSeconds?: number | null) => {
+    if (!unixSeconds) return null;
+    return new Date(unixSeconds * 1000).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const handleCancelSubscription = async () => {
+    const confirmed = window.confirm(
+      'Cancel your subscription? You will keep Premium access until the end of the current billing period.'
+    );
+    if (!confirmed) return;
+
+    setIsManagingSubscription(true);
+    setSettingsError(null);
+    setSettingsSuccess(null);
+
+    try {
+      const result = await userProfileService.cancelSubscription();
+      setSettingsSuccess(result.message);
+      setReloadKey((key) => key + 1);
+    } catch (error) {
+      setSettingsError(
+        error instanceof Error ? error.message : 'Failed to cancel subscription. Please try again.'
+      );
+    } finally {
+      setIsManagingSubscription(false);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setIsManagingSubscription(true);
+    setSettingsError(null);
+
+    try {
+      const url = await userProfileService.openBillingPortal(`${window.location.origin}/dashboard`);
+      window.location.href = url;
+    } catch (error) {
+      setSettingsError(
+        error instanceof Error ? error.message : 'Could not open billing portal. Please try again.'
+      );
+      setIsManagingSubscription(false);
+    }
+  };
+
   // Define renderSettings function correctly
   const renderSettings = () => {
     // Initialize editable fields with currentProfile data if available
@@ -1687,16 +1848,96 @@ const Dashboard: React.FC<DashboardProps> = ({ isLoggedIn = true, onLoginRequire
                     </div>
                 </div>
 
-                {/* Subscription Section (Read-only) */}
+                {/* Subscription Section */}
                 <div>
                     <h4 className="font-medium mb-3 text-lg">Subscription</h4>
-                    <p className="text-gray-600">
-                        Current Plan: <span className="font-semibold">{(currentProfile?.subscription_tier || 'free').charAt(0).toUpperCase() + 
-                                     (currentProfile?.subscription_tier || 'free').slice(1)}</span>
-                    </p>
-                    {currentProfile?.subscription_tier === 'free' && (
-                         <Link to="/pricing" className="text-sm text-primary-600 hover:underline mt-1 inline-block">Upgrade Plan</Link>
-                    )}
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm text-gray-500">Current plan</p>
+                          <p className="text-xl font-bold text-primary-700">
+                            {(normalizeSubscriptionTier(currentProfile?.subscription_tier) || 'free')
+                              .charAt(0)
+                              .toUpperCase() +
+                              (normalizeSubscriptionTier(currentProfile?.subscription_tier) || 'free').slice(1)}
+                          </p>
+                          {normalizeSubscriptionTier(currentProfile?.subscription_tier) !== 'free' && (
+                            <p className="mt-1 text-sm text-gray-600">
+                              {currentProfile?.subscription_is_lifetime ||
+                              subscriptionDetails?.isLifetime ||
+                              currentProfile?.subscription_billing_cycle === 'lifetime'
+                                ? 'Lifetime access'
+                                : currentProfile?.subscription_billing_cycle === 'annual'
+                                  ? 'Billed annually'
+                                  : currentProfile?.subscription_billing_cycle === 'monthly'
+                                    ? 'Billed monthly'
+                                    : 'Active membership'}
+                            </p>
+                          )}
+                        </div>
+                        {normalizeSubscriptionTier(currentProfile?.subscription_tier) !== 'free' && (
+                          <span className="rounded-full bg-primary-100 px-3 py-1 text-xs font-semibold text-primary-800">
+                            Benefits active
+                          </span>
+                        )}
+                      </div>
+                      {normalizeSubscriptionTier(currentProfile?.subscription_tier) === 'free' ? (
+                        <Link to="/pricing" className="mt-3 inline-block text-sm font-medium text-primary-600 hover:underline">
+                          Upgrade plan
+                        </Link>
+                      ) : (
+                        <div className="mt-4 space-y-3">
+                          <p className="text-sm text-gray-600">
+                            Includes AI travel assistant
+                            {normalizeSubscriptionTier(currentProfile?.subscription_tier) === 'enterprise'
+                              ? ' (unlimited)'
+                              : ''}
+                            , priority support, and eVisa fee discounts.
+                          </p>
+
+                          {(currentProfile?.subscription_cancel_at_period_end ||
+                            subscriptionDetails?.cancelAtPeriodEnd) && (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                              Cancellation scheduled. Premium access continues until{' '}
+                              {formatSubscriptionDate(
+                                currentProfile?.subscription_period_end ?? subscriptionDetails?.periodEnd
+                              ) || 'the end of your billing period'}
+                              .
+                            </div>
+                          )}
+
+                          {currentProfile?.subscription_is_lifetime ||
+                          subscriptionDetails?.isLifetime ||
+                          currentProfile?.subscription_billing_cycle === 'lifetime' ? (
+                            <p className="text-sm text-gray-500">
+                              Lifetime memberships do not renew. Contact support if you need billing help.
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-3 pt-1">
+                              {!currentProfile?.subscription_cancel_at_period_end &&
+                                !subscriptionDetails?.cancelAtPeriodEnd && (
+                                  <button
+                                    type="button"
+                                    onClick={handleCancelSubscription}
+                                    disabled={isManagingSubscription}
+                                    className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                  >
+                                    {isManagingSubscription ? 'Processing...' : 'Cancel subscription'}
+                                  </button>
+                                )}
+                              <button
+                                type="button"
+                                onClick={handleManageBilling}
+                                disabled={isManagingSubscription}
+                                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                              >
+                                Manage billing
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                 </div>
 
                 {/* Save Button */}

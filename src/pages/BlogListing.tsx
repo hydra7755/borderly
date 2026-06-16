@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { FaSearch, FaGlobe, FaPassport, FaMapMarkedAlt, FaUtensils, FaRoute, FaCameraRetro } from 'react-icons/fa';
 import { blogPosts } from '../data/blogs-data';
 import { BlogPost } from '../types/blog';
@@ -140,17 +140,27 @@ const eVisaBlogs: BlogPost[] = [
 
 // Blog listing page component
 const BlogListing: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const countryFilter = searchParams.get('country')?.toLowerCase() ?? '';
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filteredBlogs, setFilteredBlogs] = useState<BlogPost[]>(blogPosts);
 
+  const countryLabel = countryFilter
+    ? blogPosts.find(blog => blog.country.code.toLowerCase() === countryFilter)?.country.name
+    : undefined;
+
   // All unique categories from blog posts
   const categories = ['all', ...Array.from(new Set(blogPosts.map(blog => blog.category)))];
   
-  // Filter blogs based on category and search term
+  // Filter blogs based on category, country, and search term
   useEffect(() => {
     let filtered = blogPosts;
     
+    if (countryFilter) {
+      filtered = filtered.filter(blog => blog.country.code.toLowerCase() === countryFilter);
+    }
+
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(blog => blog.category === selectedCategory);
     }
@@ -165,16 +175,25 @@ const BlogListing: React.FC = () => {
     }
     
     setFilteredBlogs(filtered);
-  }, [selectedCategory, searchTerm]);
+  }, [selectedCategory, searchTerm, countryFilter]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="container mx-auto px-4 py-12">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Travel Blog</h1>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+            {countryLabel ? `${countryLabel} Travel Guides` : 'Travel Blog'}
+          </h1>
           <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-            Discover tips, guides, and insights for top eVisa destinations around the world
+            {countryLabel
+              ? `Stories, tips, and inspiration for your next trip to ${countryLabel}`
+              : 'Discover tips, guides, and insights for top destinations around the world'}
           </p>
+          {countryFilter && (
+            <Link to="/blogs" className="inline-block mt-4 text-primary-600 hover:text-primary-700 font-medium">
+              View all destinations →
+            </Link>
+          )}
         </div>
         
         {/* Search and filters */}
@@ -219,7 +238,7 @@ const BlogListing: React.FC = () => {
                 key={blog.id}
                 className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300"
               >
-                <Link to={`/blogs/${blog.id}`} className="block relative overflow-hidden aspect-video">
+                <Link to={`/blog/${blog.id}`} className="block relative overflow-hidden aspect-video">
                   <img 
                     src={blog.image} 
                     alt={blog.title}
@@ -244,7 +263,7 @@ const BlogListing: React.FC = () => {
                   </div>
                 </Link>
                 <div className="p-6">
-                  <Link to={`/blogs/${blog.id}`} className="block">
+                  <Link to={`/blog/${blog.id}`} className="block">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
                       {blog.title}
                     </h3>

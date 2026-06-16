@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 
 interface PricingProps {
   isLoggedIn: boolean;
@@ -9,6 +10,34 @@ interface PricingProps {
 
 const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe }) => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual' | 'lifetime'>('monthly');
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  const faqs = [
+    {
+      question: 'What are the eVisa fee discounts?',
+      answer:
+        'Premium and Enterprise plans include discounts on our eVisa service fees — 10% on Premium and up to 20% on Enterprise depending on billing cycle. Government visa fees are always separate.',
+    },
+    {
+      question: 'Can I cancel my subscription?',
+      answer:
+        'Yes. Monthly and annual subscriptions can be cancelled at any time. Benefits continue until the end of your billing period. Lifetime plans are non-refundable but include permanent access.',
+    },
+    {
+      question: 'Do prices include government visa fees?',
+      answer:
+        'No. Government visa fees vary by country and are charged separately. Our discounts apply only to Borderly processing and assistance fees.',
+    },
+    {
+      question: 'How do I pay for my subscription?',
+      answer:
+        'Payments are processed securely through Stripe. We accept all major credit and debit cards with encrypted checkout.',
+    },
+  ];
+
+  const toggleFaq = (index: number) => {
+    setOpenFaqIndex((prev) => (prev === index ? null : index));
+  };
 
   // Handle Get Started click
   const handleGetStarted = () => {
@@ -20,7 +49,6 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
     onSubscribe(planName.toLowerCase(), billingCycle);
   };
 
-  // Pricing tiers with features
   const plans = [
     {
       name: 'Basic',
@@ -42,10 +70,6 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
         { name: 'AI Travel Assistant', included: false }
       ],
       popular: false,
-      accentColor: 'text-blue-500 dark:text-blue-400',
-      bgAccent: 'bg-blue-500',
-      borderAccent: 'border-blue-500',
-      hoverAccent: 'hover:border-blue-500 hover:shadow-blue-500/10'
     },
     {
       name: 'Premium',
@@ -67,10 +91,6 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
         { name: 'AI Travel Assistant', included: true }
       ],
       popular: true,
-      accentColor: 'text-primary-600 dark:text-primary-500',
-      bgAccent: 'bg-primary-600',
-      borderAccent: 'border-primary-600',
-      hoverAccent: 'hover:border-primary-600 hover:shadow-primary-500/10'
     },
     {
       name: 'Enterprise',
@@ -92,10 +112,6 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
         { name: 'AI Travel Assistant (Unlimited)', included: true }
       ],
       popular: false,
-      accentColor: 'text-purple-600 dark:text-purple-500',
-      bgAccent: 'bg-purple-600',
-      borderAccent: 'border-purple-600',
-      hoverAccent: 'hover:border-purple-600 hover:shadow-purple-500/10'
     }
   ];
 
@@ -123,8 +139,8 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-16 px-4 sm:px-8 lg:px-12">
+      <div className="mx-auto max-w-6xl">
         <div className="text-center mb-16">
           <motion.h1
             initial={{ opacity: 0, y: -20 }}
@@ -187,27 +203,37 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid gap-8 lg:grid-cols-3 lg:gap-6"
+          className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-2 sm:px-4 lg:grid-cols-3 lg:items-stretch lg:gap-6 xl:gap-8"
         >
-          {plans.map((plan, index) => (
+          {plans.map((plan) => (
             <motion.div
               key={plan.name}
               variants={planVariants}
-              className={`relative rounded-2xl bg-white dark:bg-gray-800 shadow-xl border-2 
-                ${plan.popular ? plan.borderAccent : 'border-transparent'} 
-                ${plan.hoverAccent} transition-all duration-300 h-full flex flex-col`}
+              className={`relative flex h-full flex-col`}
             >
-              {plan.popular && (
-                <div className="absolute top-0 transform -translate-y-1/2 inset-x-0 flex justify-center">
-                  <span className={`${plan.bgAccent} text-white text-xs font-semibold px-4 py-1 rounded-full shadow-lg`}>
+              <div className="mb-3 flex h-8 items-center justify-center">
+                {plan.popular ? (
+                  <span className="rounded-full bg-primary-600 px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-white shadow-md">
                     Most Popular
                   </span>
-                </div>
-              )}
+                ) : (
+                  <span className="invisible rounded-full px-4 py-1.5 text-xs font-bold uppercase">
+                    Most Popular
+                  </span>
+                )}
+              </div>
+
+              <div
+                className={`flex h-full flex-col rounded-2xl border-2 bg-white shadow-lg transition-shadow duration-300 dark:bg-gray-800
+                  ${plan.popular
+                    ? 'border-primary-500 shadow-primary-500/10 dark:border-primary-500'
+                    : 'border-gray-200 hover:shadow-md dark:border-gray-700'
+                  }`}
+              >
               
-              <div className="p-6 md:p-8 flex-grow">
-                <div className="text-center mb-8">
-                  <h3 className={`text-2xl font-bold ${plan.accentColor}`}>{plan.name}</h3>
+              <div className="flex-grow p-6 md:p-8">
+                <div className="mb-8 text-center">
+                  <h3 className="text-2xl font-bold text-primary-700 dark:text-primary-400">{plan.name}</h3>
                   <p className="text-gray-600 dark:text-gray-400 mt-2">{plan.description}</p>
                   <div className="mt-6">
                     <span className="text-4xl font-bold text-gray-900 dark:text-white">
@@ -230,17 +256,17 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
                     {plan.features.map((feature, featureIndex) => (
                       <li key={featureIndex} className="flex items-start">
                         {feature.included ? (
-                          <svg className={`h-5 w-5 ${plan.accentColor} mt-0.5 mr-3 flex-shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="mt-0.5 mr-3 h-5 w-5 flex-shrink-0 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                           </svg>
                         ) : (
-                          <svg className="h-5 w-5 text-gray-400 mt-0.5 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="mt-0.5 mr-3 h-5 w-5 flex-shrink-0 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         )}
                         <span className="text-gray-700 dark:text-gray-300">
                           {feature.name} 
-                          {feature.value && <span className={`ml-1 font-medium ${plan.accentColor}`}>({feature.value})</span>}
+                          {feature.value && <span className="ml-1 font-medium text-primary-600 dark:text-primary-400">({feature.value})</span>}
                         </span>
                       </li>
                     ))}
@@ -248,56 +274,67 @@ const Pricing: React.FC<PricingProps> = ({ isLoggedIn, onGetStarted, onSubscribe
                 </div>
               </div>
 
-              <div className="p-6 md:px-8 md:pb-8 mt-auto">
+              <div className="mt-auto border-t border-gray-100 p-6 dark:border-gray-700 md:px-8 md:pb-8">
                 <button
-                  className={`w-full py-3 px-4 rounded-lg font-medium transition-colors
-                    ${plan.popular 
-                      ? `${plan.bgAccent} text-white hover:bg-opacity-90`
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
+                  className={`w-full rounded-xl py-3.5 px-4 font-semibold transition-colors
+                    ${plan.popular
+                      ? 'bg-primary-600 text-white shadow-md hover:bg-primary-700'
+                      : plan.name === 'Enterprise'
+                        ? 'bg-primary-500 text-white shadow-sm hover:bg-primary-600'
+                        : 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-950/40 dark:text-primary-300 dark:hover:bg-primary-900/50'
                     }`}
                   onClick={() => plan.price[billingCycle] === 0 ? handleGetStarted() : handleSubscribe(plan.name)}
                 >
                   {plan.price[billingCycle] === 0 ? 'Get Started' : 'Subscribe Now'}
                 </button>
               </div>
+              </div>
             </motion.div>
           ))}
         </motion.div>
 
-        {/* Additional information */}
-        <div className="mt-16 bg-white dark:bg-gray-800 rounded-xl shadow-md p-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Frequently Asked Questions</h2>
-          
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mt-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">What are the eVisa fee discounts?</h3>
-              <p className="text-gray-700 dark:text-gray-300">
-                Premium and Enterprise plans include a 10% discount on service fees for eVisa applications. This discount applies to our processing and assistance fees.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Can I cancel my subscription?</h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Yes, you can cancel your monthly or annual subscription at any time. Your benefits will continue until the end of your billing period.
-                Lifetime subscriptions are non-refundable but provide permanent access to all included features.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Do prices include government visa fees?</h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                No, government visa fees are separate and vary by country. Our service fee discounts apply to our processing and assistance fees,
-                not to the official government charges which we pass through directly to you without markup.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">How do I pay for my subscription?</h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                We use Stripe as our secure payment processor. You can pay using any major credit or debit card. All transactions are encrypted and secure.
-              </p>
-            </div>
+        {/* FAQ accordion */}
+        <div className="mt-20 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-8">
+          <h2 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">
+            Frequently Asked Questions
+          </h2>
+
+          <div className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
+            {faqs.map((faq, index) => {
+              const isOpen = openFaqIndex === index;
+              return (
+                <div key={faq.question} className="bg-white dark:bg-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => toggleFaq(index)}
+                    className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40 sm:px-6"
+                    aria-expanded={isOpen}
+                  >
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white sm:text-lg">
+                      {faq.question}
+                    </h3>
+                    <span className="shrink-0 text-gray-400">
+                      {isOpen ? <FaChevronUp className="h-4 w-4" /> : <FaChevronDown className="h-4 w-4" />}
+                    </span>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <p className="px-5 pb-5 text-sm leading-relaxed text-gray-600 dark:text-gray-300 sm:px-6 sm:text-base">
+                          {faq.answer}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
         </div>
         

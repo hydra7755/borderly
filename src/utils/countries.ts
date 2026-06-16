@@ -209,6 +209,28 @@ export const ALL_COUNTRIES = [
 ];
 
 /**
+ * Resolves a country code, name, or alpha-3 code to a lowercase ISO alpha-2 code for flags.
+ */
+export function resolveCountryFlagCode(input: string | undefined | null): string | null {
+  if (!input?.trim()) return null;
+
+  const trimmed = input.trim();
+  if (trimmed.length === 2) return trimmed.toLowerCase();
+
+  if (trimmed.length === 3) {
+    const alpha2 = convertAlpha3ToAlpha2(trimmed);
+    if (alpha2) return alpha2;
+  }
+
+  const normalized = trimmed.toLowerCase();
+  const byName = ALL_COUNTRIES.find((c) => c.name.toLowerCase() === normalized);
+  if (byName) return byName.code;
+
+  const byCode = ALL_COUNTRIES.find((c) => c.code === normalized);
+  return byCode?.code ?? null;
+}
+
+/**
  * Gets the URL for a country flag based on the country code with multiple fallback options
  * @param countryCode - ISO 3166-1 alpha-2 country code or alpha-3 code
  * @param size - Size of the flag image

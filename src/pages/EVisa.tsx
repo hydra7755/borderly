@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import VisaApplicationStepper from '../components/EVisa/VisaApplicationStepper';
 import EVisaHeader from '../components/EVisa/EVisaHeader';
@@ -7,6 +7,7 @@ import EVisaHeader from '../components/EVisa/EVisaHeader';
 const EVisa: React.FC = () => {
   const { nationality, destination } = useParams<{ nationality: string; destination: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [applicationId] = useState(() => `evisa-${nationality}-${destination}-${Date.now()}`);
 
   // Validate params
@@ -49,6 +50,9 @@ const EVisa: React.FC = () => {
           <div className="p-6">
             <VisaApplicationStepper 
               onComplete={handleApplicationComplete}
+              destinationCode={destination}
+              nationalityCode={nationality}
+              searchParams={location.search}
             />
           </div>
         </motion.div>

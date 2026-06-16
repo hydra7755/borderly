@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import VisaApplicationStepper from '../components/EVisa/VisaApplicationStepper';
 import visaApplicationsService from '../lib/api/visaApplications';
 import authService from '../lib/api/auth';
@@ -10,6 +10,7 @@ import {
 
 const VisaApplicationPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { nationality, destination } = useParams<{ nationality: string; destination: string }>();
 
   const handleApplicationComplete = async (data: {
@@ -70,6 +71,8 @@ const VisaApplicationPage: React.FC = () => {
 
         <VisaApplicationStepper
           destinationCode={destination}
+          nationalityCode={nationality}
+          searchParams={location.search}
           onComplete={handleApplicationComplete}
         />
       </div>

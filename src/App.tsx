@@ -24,6 +24,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavig
 import VisaChecker from './pages/VisaChecker';
 import AIAssistant from './pages/AIAssistant';
 import authService from './lib/api/auth';
+import userProfileService from './lib/api/userProfile';
 import { User } from '@supabase/supabase-js';
 import BlogListing from './pages/BlogListing';
 import BlogDetail from './pages/BlogDetail';
@@ -183,6 +184,21 @@ const AppContent: React.FC = () => {
           if (user && !userError) {
             setCurrentUser(user);
             setIsLoggedIn(true);
+            const { profile } = await userProfileService.getCurrentUserProfile();
+            if (profile?.subscription_tier) {
+              setCurrentUser((prev) =>
+                prev
+                  ? ({
+                      ...prev,
+                      subscription_tier: profile.subscription_tier,
+                      user_metadata: {
+                        ...(prev.user_metadata || {}),
+                        subscription_tier: profile.subscription_tier,
+                      },
+                    } as User)
+                  : prev
+              );
+            }
           }
         }
       } catch (error) {
@@ -214,7 +230,19 @@ const AppContent: React.FC = () => {
       
       if (user && session) {
         setCurrentUser(user);
-    setIsLoggedIn(true);
+        setIsLoggedIn(true);
+
+        const { profile } = await userProfileService.getCurrentUserProfile();
+        if (profile?.subscription_tier) {
+          setCurrentUser({
+            ...user,
+            subscription_tier: profile.subscription_tier,
+            user_metadata: {
+              ...(user.user_metadata || {}),
+              subscription_tier: profile.subscription_tier,
+            },
+          } as User);
+        }
     
     // Check if we have a pending redirect
     const redirectPage = localStorage.getItem('redirectAfterLogin');

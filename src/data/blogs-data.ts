@@ -350,9 +350,572 @@ export const blogPosts: BlogPost[] = [
     ]
   },
   
-  // Add similar entries for other countries and topics
-  // To keep the file manageable, I'm including just one full example per country
-  // In a real implementation, all 50 blog posts would be included (5 per country)
+  // Italy
+  {
+    id: 'it-symphony-sunsets',
+    title: 'Italy – A Symphony of Sunsets, Stone, and Slow Living',
+    subtitle: 'L\'ora d\'oro and the art of il dolce far niente',
+    excerpt: 'There is a specific time of day in Italy, just as the sun dips below the terracotta rooftops of Florence or the dramatic cliffs of Positano, where the world turns entirely golden. They call it l\'ora d\'oro—the golden hour.',
+    author: 'Borderly Team',
+    date: 'June 1, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/it_image_1',
+    category: 'Travel',
+    country: { name: 'Italy', code: 'it' },
+    tags: ['italy travel', 'romance', 'tuscany', 'amalfi coast', 'schengen'],
+    content: [
+      'There is a specific time of day in Italy, just as the sun dips below the terracotta rooftops of Florence or the dramatic cliffs of Positano, where the world turns entirely golden. They call it l\'ora d\'oro—the golden hour. But in truth, Italy doesn\'t need a specific hour to enchant you; it breathes a timeless romance into every corner it touches.',
+      'To travel through Italy is to fall in love with the art of doing nothing (il dolce far niente). It is the feeling of cool marble under your fingertips in a Roman piazza, the scent of wild jasmine hanging heavy over a cobblestone alleyway in Taormina, and the rhythmic, hypnotic splash of a gondola paddle navigating the misty, silent canals of Venice at dawn.',
+      'Imagine waking up to the sound of church bells echoing across the rolling, cypress-lined hills of Tuscany. You spend your afternoon driving a vintage Alfa Romeo along the twists and turns of the Amalfi Coast, the salty sea breeze in your hair, before settling into a candlelit trattoria tucked away in a hidden courtyard. Here, over a bottle of ruby-red Chianti and handmade pasta, time slows down completely. Italy asks you to put away your watch, look into the eyes of the one you are with, and simply exist.',
+      'Ready to write your own Italian love story? Don\'t let paperwork stand between you and the cobbles of Rome. Snap a photo of your passport, and let our seamless visa platform handle the rest while you pack your bags.'
+    ]
+  },
+
+  // France
+  {
+    id: 'fr-beyond-paris',
+    title: 'France – Beyond the Glittering Lights of Paris',
+    subtitle: 'From lavender fields to fairy-tale châteaux',
+    excerpt: 'While the world has long sung praises of the Eiffel Tower sparkling against the midnight sky, France\'s true romance lies in its quiet transitions—found when you leave the grand boulevards of Paris behind and drift into the cinematic landscapes of the countryside.',
+    author: 'Borderly Team',
+    date: 'June 3, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/fr_image_1',
+    category: 'Travel',
+    country: { name: 'France', code: 'fr' },
+    tags: ['france travel', 'provence', 'french riviera', 'romance', 'schengen'],
+    content: [
+      'While the world has long sung praises of the Eiffel Tower sparkling against the midnight sky, France\'s true romance lies in its quiet transitions. It is found when you leave the grand boulevards of Paris behind and drift into the cinematic landscapes of the countryside.',
+      'Picture the rolling wave of violet that is Provence in mid-summer, where fields of lavender stretch out as far as the eye can see, filling the warm air with a soothing, earthy perfume. Imagine walking hand-in-hand through the medieval stone village of Gordes, stopping only to sample fresh figs and artisanal cheeses at a sun-dappled morning market.',
+      'Further south, the French Riviera beckons with its old-world glamour. In Antibes, the azure waters of the Mediterranean lap gently against ancient stone ramparts, while mega-yachts slice silently through the sea. For a different kind of magic, travel north to the Loire Valley, where fairy-tale châteaux rise like mirages from the morning mist, surrounded by dense, emerald forests and vineyards that have perfected the art of winemaking over centuries. France is a tapestry woven from history, indulgence, and poetic landscapes—a place designed for dreamers.',
+      'The cafes of Paris and fields of Provence are calling. Skip the confusing government forms. Use our interactive checkout to secure your French gateway effortlessly.'
+    ]
+  },
+
+  // Spain
+  {
+    id: 'es-passion-poetry',
+    title: 'Spain – Passion, Poetry, and Moorish Magic',
+    subtitle: 'Flamenco rhythms and Alhambra twilight',
+    excerpt: 'Spain does not whisper; it sings with a fiery, unbridled passion that quickens the pulse of anyone who walks its shores. It is a land of dramatic contrasts, where flamenco in Seville coexists with the serene mountain breezes of the Sierra Nevada.',
+    author: 'Borderly Team',
+    date: 'June 5, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/es_image_1',
+    category: 'Travel',
+    country: { name: 'Spain', code: 'es' },
+    tags: ['spain travel', 'andalusia', 'barcelona', 'flamenco', 'schengen'],
+    content: [
+      'Spain does not whisper; it sings with a fiery, unbridled passion that quickens the pulse of anyone who walks its shores. It is a land of dramatic contrasts, where the fierce rhythm of flamenco heels striking wooden floors in Seville coexists with the serene, whisper-soft mountain breezes of the Sierra Nevada.',
+      'In Andalusia, the air smells of orange blossoms and history. To walk through the grand arches of Granada\'s Alhambra palace at dusk is to step directly into a living poem of water mirrors, intricate stone carvings, and hidden courtyards where kings and queens once harbored secrets.',
+      'As night falls, Spain transforms into a theater of shared life. The streets of Madrid and Barcelona come alive not with rushed commuters, but with laughter, clinking glasses of sangria, and the casual intimacy of tapas hopping. Whether you are watching the crashing Atlantic waves meet the rugged, green cliffs of San Sebastián in the north or getting lost in the surreal, architectural dreamscapes of Gaudí\'s Barcelona, Spain demands that you live vividly, passionately, and thoroughly in the present moment.',
+      'Immerse yourself in the rhythm of Spain. Our smart platform dynamically adapts to your itinerary, removing the visa headache so you can focus on the journey.'
+    ]
+  },
+
+  // Portugal
+  {
+    id: 'pt-melancholy-melodies',
+    title: 'Portugal – Melancholy Melodies and Golden Shores',
+    subtitle: 'Saudade, Fado, and the Algarve cliffs',
+    excerpt: 'There is a word in the Portuguese language that has no direct translation: Saudade. It is a deep, sweet, romantic longing for a place, a person, or a time gone by—the defining soul of Portugal.',
+    author: 'Borderly Team',
+    date: 'June 7, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/pt_image_1',
+    category: 'Travel',
+    country: { name: 'Portugal', code: 'pt' },
+    tags: ['portugal travel', 'lisbon', 'algarve', 'fado', 'schengen'],
+    content: [
+      'There is a word in the Portuguese language that has no direct translation: Saudade. It is a deep, sweet, romantic longing for a place, a person, or a time gone by. It is the defining soul of Portugal, and the moment you step foot in this sun-bleached coastal paradise, you will feel it too.',
+      'In Lisbon, old iron trams rattle up impossibly steep hills, past pastel-colored buildings adorned with intricate, hand-painted ceramic tiles (azulejos). As twilight settles over the city, the haunting, beautiful strains of Fado music drift out of dark, candlelit taverns in the Alfama district, capturing the very essence of romance and desire.',
+      'Travel north along the winding Douro River, where terraced vineyards step down dramatically to meet the water\'s edge, producing the world\'s finest port wines. Or, if your soul craves the sea, journey south to the Algarve. Here, towering golden limestone cliffs form hidden, cathedral-like sea caves where the emerald Atlantic crashes against secluded beaches perfect for a hidden escape. Portugal is an intimate, sun-drenched sanctuary waiting to be discovered.',
+      'Uncover the hidden coastlines of Portugal. Don\'t worry about the complex documentation—our OCR passport scanner sets your application up in seconds.'
+    ]
+  },
+
+  // Greece
+  {
+    id: 'gr-myths-eternal-blue',
+    title: 'Greece – Where Myths Meet the Eternal Blue',
+    subtitle: 'Cyclades sails and moonlit Acropolis',
+    excerpt: 'To open your eyes in Greece is to look upon a world painted in only two colors: the purest, blinding white and the deepest, most infinite Aegean blue—a place where ancient myth and modern paradise dissolve into one.',
+    author: 'Borderly Team',
+    date: 'June 9, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/gr_image_1',
+    category: 'Travel',
+    country: { name: 'Greece', code: 'gr' },
+    tags: ['greece travel', 'santorini', 'cyclades', 'athens', 'schengen'],
+    content: [
+      'To open your eyes in Greece is to look upon a world painted in only two colors: the purest, blinding white and the deepest, most infinite Aegean blue. It is a place where the boundary between ancient myth and modern-day paradise completely dissolves.',
+      'While Santorini is famous for its iconic blue-domed churches and the sunsets that paint the caldera in strokes of pink and gold, Greece offers endless canvases for romance. Imagine charting a private sailboat through the Cyclades, dropping anchor in a deserted cove off Milos where the water is so clear your boat appears to be floating in mid-air.',
+      'On the mainland, history stands proud against the sky. Walking up the ancient slopes of the Acropolis in Athens under the moonlight feels like a brush with the gods themselves. Down in the seaside tavernas of Nafplio or the wild, rugged peninsula of the Mani, evenings are spent over plates of grilled olives, fresh seafood, and local wine under a canopy of stars. Greece is an intoxicating sensory awakening that reminds you how beautiful it is to be alive.',
+      'Your Aegean escape is closer than you think. Let our dynamic multi-step form handle your Schengen requirements seamlessly behind the scenes.'
+    ]
+  },
+
+  // Malta
+  {
+    id: 'mt-honey-stone-haven',
+    title: 'Malta – A Golden Honey-Stone Haven in the Heart of the Sea',
+    subtitle: 'Valletta by lamplight and the Silent City of Mdina',
+    excerpt: 'Rising proudly from the shimmering depths of the central Mediterranean, Malta is an island nation sculpted from warm, honey-colored limestone and steeped in thousands of years of maritime history.',
+    author: 'Borderly Team',
+    date: 'June 11, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/mt_image_1',
+    category: 'Travel',
+    country: { name: 'Malta', code: 'mt' },
+    tags: ['malta travel', 'valletta', 'mdina', 'mediterranean', 'schengen'],
+    content: [
+      'Rising proudly from the shimmering, ultra-marine depths of the central Mediterranean is Malta, an island nation sculpted from warm, honey-colored limestone and steeped in thousands of years of maritime history.',
+      'Malta\'s romance is cinematic and grand. Valletta, the walled capital city built by the Knights of St. John, features dramatic baroque architecture, steep hilly streets that frame sudden views of the deep blue harbor, and hidden wine bars carved directly into ancient stone bastions. Walking through Valletta at night, when the gas lamps flicker against the golden stone, feels like stepping back into a romantic espionage novel.',
+      'For absolute serenity, escape to Mdina—the "Silent City." Perched high on a hill in the center of the island, no cars are permitted past its grand medieval gates. As afternoon tourists leave, a profound, romantic quiet falls over its winding, lantern-lit alleys. Here, you can hear the faint echo of your own footsteps and the distant rustle of bougainvillea against noble palace walls, making you feel as if you\'ve discovered a secret world entirely your own.',
+      'Step back in time in the Mediterranean. Use our platform to securely save your progress and complete your visa application at your own pace.'
+    ]
+  },
+
+  // Croatia
+  {
+    id: 'hr-terracotta-jewel',
+    title: 'Croatia – The Terracotta Jewel of the Adriatic',
+    subtitle: 'Dubrovnik ramparts, Hvar harbors, and Plitvice dreams',
+    excerpt: 'Croatia is a place where the dense green of pine forests, the shimmering white of limestone, and the endless brilliant turquoise of the Adriatic Sea converge into one breathtaking landscape.',
+    author: 'Borderly Team',
+    date: 'June 13, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/hr_image_1',
+    category: 'Travel',
+    country: { name: 'Croatia', code: 'hr' },
+    tags: ['croatia travel', 'dubrovnik', 'hvar', 'adriatic', 'schengen'],
+    content: [
+      'Croatia is a place where the dense green of pine forests, the shimmering white of limestone, and the endless brilliant turquoise of the Adriatic Sea converge into one breathtaking landscape.',
+      'The crown jewel is Dubrovnik, a city wrapped completely in magnificent stone medieval walls. Walking along these ramparts as the sun sets over the sea, looking down at a sea of terracotta roof tiles contrasting against the deep blue water, is one of the world\'s great romantic views.',
+      'But Croatia\'s magic expands far beyond its stone walls. Sail away to the island of Hvar, where the air is heavily perfumed with wild lavender and rosemary, and the stone harbors are lined with vibrant waterfront cafes. For nature lovers, the interior holds the ethereal Plitvice Lakes—a dreamscape of 16 interconnected terraced lakes and countless cascading waterfalls weaving through a dense, emerald forest. Whether floating on the sea or walking beneath waterfalls, Croatia is a paradise of raw, natural poetry.',
+      'The Adriatic coast awaits your arrival. Our intelligent platform takes care of the strict Schengen rules automatically, giving you total peace of mind.'
+    ]
+  },
+
+  // Germany
+  {
+    id: 'de-fairy-tale-forests',
+    title: 'Germany – Fairy-Tale Forests and Riverfront Castles',
+    subtitle: 'Brothers Grimm landscapes along the Rhine',
+    excerpt: 'There is a profound, old-world magic that settles over Germany when the morning mist rises off the Rhine River. Beyond its cutting-edge cities and sleek highways lies a landscape straight from the pages of the Brothers Grimm.',
+    author: 'Borderly Team',
+    date: 'June 15, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/de_image_1',
+    category: 'Travel',
+    country: { name: 'Germany', code: 'de' },
+    tags: ['germany travel', 'rhine', 'neuschwanstein', 'romance', 'schengen'],
+    content: [
+      'There is a profound, old-world magic that settles over Germany when the morning mist rises off the Rhine River. Beyond its cutting-edge cities and sleek highways lies a landscape straight from the pages of the Brothers Grimm—where dense, emerald woodlands give way to majestic castles perched precariously on rocky crags.',
+      'Imagine wandering hand-in-hand through the timber-framed streets of Rothenburg ob der Tauber, where the architecture has remained unchanged since the Middle Ages. Picture yourself looking up at the dreamlike white towers of Neuschwanstein Castle, framed perfectly by the snow-capped Bavarian Alps and mirror-like lakes below. In the evenings, Germany invites you to slow down in cozy, candlelit taverns, sharing hearty dishes and exceptional local Riesling. It is a country where folklore and deep cultural heritage blend seamlessly into an unforgettable, romantic journey.',
+      'Your storybook German getaway is just a few clicks away. Don\'t let complicated visa paperwork stall your travel plans. Take a photo of your passport and let our platform clear your path to Europe.'
+    ]
+  },
+
+  // Switzerland
+  {
+    id: 'ch-alpine-majesty',
+    title: 'Switzerland – Alpine Majesty and Mirror-Like Lakes',
+    subtitle: 'Matterhorn peaks and Lake Lucerne serenity',
+    excerpt: 'Switzerland is a country designed to take your breath away—a pristine world where the jagged peaks of the Matterhorn and Eiger slice into an impossibly blue sky, and cascading waterfalls tumble into lush green valleys.',
+    author: 'Borderly Team',
+    date: 'June 17, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/ch_image_1',
+    category: 'Travel',
+    country: { name: 'Switzerland', code: 'ch' },
+    tags: ['switzerland travel', 'alps', 'zermatt', 'lucerne', 'schengen'],
+    content: [
+      'Switzerland is a country designed to take your breath away. It is a pristine world where the jagged, dramatic peaks of the Matterhorn and Eiger slice into an impossibly blue sky, and cascading waterfalls tumble into lush, green valleys dotted with grazing cattle.',
+      'The true romance of Switzerland is experienced in its stillness. Imagine waking up in a luxury wooden chalet in Zermatt, watching the first light of dawn paint the mountain peaks in shades of pink and gold. Spend your day taking a panoramic train ride across high mountain passes, or drifting on a historic paddle steamer across the crystal-clear waters of Lake Lucerne. Whether you are walking through the car-free alleys of a hidden mountain village or indulging in world-class fondue by a roaring fireplace, Switzerland offers an intimate, elevated escape from the rest of the world.',
+      'Ready to stand among the peaks of Europe? Skip the administrative headache. Our smart application wizard streamlines your Swiss Schengen visa process seamlessly.'
+    ]
+  },
+
+  // Austria
+  {
+    id: 'at-imperial-elegance',
+    title: 'Austria – Imperial Elegance and Mountainside Melodies',
+    subtitle: 'Vienna ballrooms and Hallstatt lakeside charm',
+    excerpt: 'Austria breathes to the rhythm of classical music, imperial grandeur, and sweeping natural beauty—a timeless sanctuary where lavish palaces meet quiet alpine villages.',
+    author: 'Borderly Team',
+    date: 'June 19, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/at_image_1',
+    category: 'Travel',
+    country: { name: 'Austria', code: 'at' },
+    tags: ['austria travel', 'vienna', 'hallstatt', 'alps', 'schengen'],
+    content: [
+      'Austria breathes to the rhythm of classical music, imperial grandeur, and sweeping natural beauty. It is a destination where the lavish palaces of Vienna meet the quiet, alpine charm of lakeside villages, making it a timeless sanctuary for lovers of art, history, and nature.',
+      'In Vienna, romance takes the form of grand marble ballrooms, elegant horse-drawn carriages clattering over cobblestones, and slow afternoons spent in historic coffeehouses over slices of rich Sachertorte. To the west, the landscape shifts dramatically into the Tyrolean Alps. Imagine walking through Hallstatt, a village wedged beautifully between a serene glass lake and towering mountains, its 16th-century alpine houses draped in vibrant ivy. Austria blends the sophisticated grace of a bygone era with the refreshing purity of the mountains.',
+      'Experience the timeless grace of Austria. Leave the complex form validation to us—our platform handles your documentation securely while you plan your itinerary.'
+    ]
+  },
+
+  // Czech Republic
+  {
+    id: 'cz-gothic-romance-prague',
+    title: 'Czech Republic – The Gothic Romance of Prague',
+    subtitle: 'Charles Bridge at dawn and a city of spires',
+    excerpt: 'Prague is often called the "City of a Hundred Spires," but to walk its streets is to feel like you have stepped inside a living, breathing architectural poem.',
+    author: 'Borderly Team',
+    date: 'June 21, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/cz_image_1',
+    category: 'Travel',
+    country: { name: 'Czech Republic', code: 'cz' },
+    tags: ['czech republic travel', 'prague', 'charles bridge', 'romance', 'schengen'],
+    content: [
+      'Prague is often called the "City of a Hundred Spires," but to walk its streets is to feel like you have stepped inside a living, breathing architectural poem. Framed by winding cobblestone alleys, dramatic Gothic towers, and pastel Baroque facades, it is easily one of the most romantic cities on earth.',
+      'The magic of Prague is best captured at dawn on the Charles Bridge. As the morning fog hangs low over the Vltava River, the historic stone statues along the bridge emerge like silhouettes against a soft gold sky. Get lost together in the winding labyrinth of the Old Town, discover hidden courtyards hosting quiet wine bars, and climb the hill to Prague Castle as twilight falls and the city lights begin to glitter below like a chest of jewels.',
+      'Prague\'s historic charm is waiting for you. Use our streamlined, mobile-friendly interface to complete your application and bypass the traditional visa friction.'
+    ]
+  },
+
+  // Hungary
+  {
+    id: 'hu-thermal-waters',
+    title: 'Hungary – Thermal Waters and Danube Twilights',
+    subtitle: 'Budapest baths and Parliament at night',
+    excerpt: 'Hungary is a country defined by the majestic flow of the Danube River and an old-world elegance that warms the soul—where grand historic architecture reflects on dark rippling waters.',
+    author: 'Borderly Team',
+    date: 'June 23, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/hu_image_1',
+    category: 'Travel',
+    country: { name: 'Hungary', code: 'hu' },
+    tags: ['hungary travel', 'budapest', 'thermal baths', 'danube', 'schengen'],
+    content: [
+      'Hungary is a country defined by the majestic flow of the Danube River and an old-world elegance that warms the soul. Its capital, Budapest, is a cinematic masterpiece split in two, where grand historic architecture reflects beautifully on the dark rippling waters of the river.',
+      'Imagine spending a crisp afternoon soaking in the healing, mineral-rich thermal waters of the historic Széchenyi or Gellért baths, surrounded by grand neo-Baroque columns. As night falls, take a romantic stroll across the illuminated Chain Bridge from hilly Buda to vibrant Pest, or enjoy a glass of sweet Tokaji wine at a cozy restaurant while watching the Parliament building light up the night sky like a golden palace. Hungary offers a perfect blend of historic opulence, relaxation, and soulful romance.',
+      'Soak in the beauty of Central Europe. Our interactive platform dynamically adapts to your travel needs, making your visa acquisition effortless.'
+    ]
+  },
+
+  // Poland
+  {
+    id: 'pl-secret-squares',
+    title: 'Poland – Secret Squares and Gothic Heritage',
+    subtitle: 'Kraków\'s medieval heart and the Tatra Mountains',
+    excerpt: 'Poland is a hidden romantic treasure, offering a beautiful mix of sweeping Baltic coastlines, rugged mountain peaks, and cities with beautifully preserved medieval hearts.',
+    author: 'Borderly Team',
+    date: 'June 25, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/pl_image_1',
+    category: 'Travel',
+    country: { name: 'Poland', code: 'pl' },
+    tags: ['poland travel', 'krakow', 'zakopane', 'gothic', 'schengen'],
+    content: [
+      'Poland is a hidden romantic treasure, offering a beautiful mix of sweeping Baltic coastlines, rugged mountain peaks, and cities that boast beautifully preserved medieval hearts.',
+      'In Kraków, the romance is palpable. The Rynek Główny—Europe\'s largest medieval town square—is lined with beautiful townhouses, outdoor cafes, and horse-drawn carriages. In the evening, the square fills with the soft glow of streetlamps and the melancholy melody of the trumpet call from St. Mary\'s Basilica. Walk hand-in-hand through the historic Jewish quarter of Kazimierz, exploring its bohemian candlelit bars, or head south to Zakopane, where cozy wooden chalets sit nestled at the base of the dramatic, snow-dusted Tatra Mountains.',
+      'Discover the untold beauty of Poland. Avoid the confusion of strict government regulations by letting our automated system manage your paperwork.'
+    ]
+  },
+
+  // Slovakia
+  {
+    id: 'sk-hidden-castles',
+    title: 'Slovakia – Hidden Castles and Untamed Peaks',
+    subtitle: 'High Tatras fortresses and Bratislava\'s Old Town',
+    excerpt: 'Slovakia is a destination for travelers seeking a quieter, more intimate encounter with Europe\'s historic soul—dominated by jagged High Tatras peaks and hundreds of ancient fortresses.',
+    author: 'Borderly Team',
+    date: 'June 27, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/sk_image_1',
+    category: 'Travel',
+    country: { name: 'Slovakia', code: 'sk' },
+    tags: ['slovakia travel', 'bratislava', 'high tatras', 'castles', 'schengen'],
+    content: [
+      'Slovakia is a destination for travelers seeking a quieter, more intimate encounter with Europe\'s historic soul. It is a land dominated by the dramatic, jagged peaks of the High Tatras and a landscape dotted with hundreds of ancient fortresses and fairy-tale châteaux.',
+      'In Bratislava, the capital city, romance thrives in its compact, pedestrian-only Old Town, where narrow alleys reveal charming statues, boutique cafes, and hidden wine cellars serving exceptional local vintages. For a truly magical escape, journey into the countryside to explore Bojnice Castle, a stunning romantic structure surrounded by centuries-old parklands, or hike to the dramatic ruins of Spiš Castle as the sun sets over the sweeping valleys below.',
+      'Escape to the heart of Europe. Our platform handles the intricate details of your Schengen visa, giving you more time to curate your dream route.'
+    ]
+  },
+
+  // Liechtenstein
+  {
+    id: 'li-alpine-principality',
+    title: 'Liechtenstein – An Intimate Alpine Principality',
+    subtitle: 'Vaduz castle and Rhine Valley vineyards',
+    excerpt: 'Tucked quietly between Switzerland and Austria is Liechtenstein, a tiny alpine principality that feels like a private mountain sanctuary where nature and royal heritage live in perfect harmony.',
+    author: 'Borderly Team',
+    date: 'June 29, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/li_image_1',
+    category: 'Travel',
+    country: { name: 'Liechtenstein', code: 'li' },
+    tags: ['liechtenstein travel', 'vaduz', 'alps', 'rhine valley', 'schengen'],
+    content: [
+      'Tucked quietly between Switzerland and Austria is Liechtenstein, a tiny alpine principality that feels like a private mountain sanctuary. Dominated by the soaring peaks of the Alps and the sweeping Rhine Valley, it is a place where nature and royal heritage live in perfect harmony.',
+      'The capital, Vaduz, is overlooked by a magnificent medieval castle perched high on a forested hillside, where the princely family still resides. Walk through the pristine, quiet vineyards of the lowlands, sampling exquisite royal wines, or head up into the mountains to Malbun, where alpine trails wind through valleys filled with wild alpine flowers. Liechtenstein offers a deeply exclusive, serene, and peaceful romantic getaway.',
+      'Discover Europe\'s hidden principality. Use our smart platform to securely upload your documents and jumpstart your European journey today.'
+    ]
+  },
+
+  // Belgium
+  {
+    id: 'be-chocolates-canals',
+    title: 'Belgium – Chocolates, Canals, and Cobblestones',
+    subtitle: 'Bruges canals and candlelit bistro evenings',
+    excerpt: 'While Belgium is famous globally for its rich heritage of art, lace, and world-class culinary indulgences, its true magic belongs to the dreamers who wander its historic northern canals.',
+    author: 'Borderly Team',
+    date: 'July 1, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/be_image_1',
+    category: 'Travel',
+    country: { name: 'Belgium', code: 'be' },
+    tags: ['belgium travel', 'bruges', 'brussels', 'chocolate', 'schengen'],
+    content: [
+      'While Belgium is famous globally for its rich heritage of art, lace, and world-class culinary indulgences, its true magic belongs to the dreamers who wander its historic northern canals.',
+      'Bruges, often called the "Venice of the North," is an absolute masterpiece of medieval romance. Picture drifting lazily on a small boat along quiet canals, passing beneath low stone bridges draped in weeping willows, while the reflection of swan-filled waters plays against ancient brick guild houses. In Brussels or Antwerp, the grand squares fill with the scent of warm, caramelized waffles and rich artisanal chocolate. Sitting in a candlelit bistro, sharing a complex Belgian abbey ale as rain gently slicks the cobblestones outside, is an exercise in pure comfort and intimacy.',
+      'Indulge in the romance of Belgium. Save your progress at any time on our user-friendly portal and secure your entry voucher smoothly.'
+    ]
+  },
+
+  // Netherlands
+  {
+    id: 'nl-windmills-waterways',
+    title: 'Netherlands – Windmills, Waterways, and Endless Blooms',
+    subtitle: 'Jordaan canals and tulip fields in spring',
+    excerpt: 'The Netherlands is a masterclass in elegant, slow-paced charm—a flat, beautifully manicured landscape where historic waterways cut through vibrant towns and endless tulip fields paint the earth each spring.',
+    author: 'Borderly Team',
+    date: 'July 3, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/nl_image_1',
+    category: 'Travel',
+    country: { name: 'Netherlands', code: 'nl' },
+    tags: ['netherlands travel', 'amsterdam', 'tulips', 'windmills', 'schengen'],
+    content: [
+      'The Netherlands is a masterclass in elegant, slow-paced charm. It is a flat, beautifully manicured landscape where historic waterways cut through vibrant historic towns, and endless fields of tulips paint the earth in brilliant stripes of color each spring.',
+      'In Amsterdam, true romance is found away from the bustling center. Step into the quiet, lantern-lit canals of the Jordaan district at night, where the historic canal houses glow warmly from within. Rent a bicycle for two and ride out into the countryside of Utrecht or Haarlem, passing historic wooden windmills and stopping for picnics along quiet dikes. The Netherlands offers a breezy, poetic, and effortlessly beautiful travel experience.',
+      'Your Dutch springtime escape awaits. Our platform features a built-in document check to ensure your visa application is flawless before you pay.'
+    ]
+  },
+
+  // Luxembourg
+  {
+    id: 'lu-gorges-greenery',
+    title: 'Luxembourg – The Grand Duchy of Gorges and Greenery',
+    subtitle: 'Chemin de la Corniche and the Valley of Seven Castles',
+    excerpt: 'Luxembourg may be one of the world\'s smallest sovereign states, but it packs a dramatic, fairy-tale punch—built over deep river gorges and dramatic sandstone cliffs wrapped in lush green forests.',
+    author: 'Borderly Team',
+    date: 'July 5, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/lu_image_1',
+    category: 'Travel',
+    country: { name: 'Luxembourg', code: 'lu' },
+    tags: ['luxembourg travel', 'grund', 'moselle', 'castles', 'schengen'],
+    content: [
+      'Luxembourg may be one of the world\'s smallest sovereign states, but it packs a dramatic, fairy-tale punch. Built over deep, sheer river gorges and dramatic sandstone cliffs, the capital city is a stunning multi-layered fortress wrapped in lush green forests.',
+      'Imagine walking along the Chemin de la Corniche—often called "Europe\'s most beautiful balcony"—looking down at the quiet river, ancient stone bridges, and the slate-roofed houses of the Grund district nestled in the valley below. Outside the city, the romantic Valley of the Seven Castles beckons with its dense woodlands and medieval ruins, while the Moselle wine region offers sun-dappled hillsides perfect for sipping crisp white sparkling wines with the one you love.',
+      'Uncover the dramatic landscapes of Luxembourg. Let our intuitive visa wizard guide you through your requirements in minutes.'
+    ]
+  },
+
+  // Denmark
+  {
+    id: 'dk-seaside-romance',
+    title: 'Denmark – The Cozy Art of Seaside Romance',
+    subtitle: 'Hygge, Nyhavn, and Baltic dune coastlines',
+    excerpt: 'Denmark is the birthplace of hygge—that beautiful concept of coziness, comfort, and contentment—offering soft coastal light, historic wooden harbors, and an effortlessly stylish way of living.',
+    author: 'Borderly Team',
+    date: 'July 7, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/dk_image_1',
+    category: 'Travel',
+    country: { name: 'Denmark', code: 'dk' },
+    tags: ['denmark travel', 'copenhagen', 'hygge', 'nyhavn', 'schengen'],
+    content: [
+      'Denmark is the birthplace of hygge—that beautiful Danish concept of coziness, comfort, and contentment that makes the soul feel completely at home. It is a country of soft coastal light, historic wooden harbors, and an effortlessly stylish way of living.',
+      'In Copenhagen, romance is found riding a bicycle through the historic, colorful waterfront of Nyhavn, or sharing a blanket under the twinkling fairy lights of the historic Tivoli Gardens. Escape to the Danish riviera, where sweeping white sand dunes meet the wild Baltic Sea, and historic seaside hotels serve fresh seafood by candlelight. Denmark teaches you that true luxury lies in the simple, shared moments of warmth and quiet comfort.',
+      'Experience the warmth of Danish hospitality. Skip the long lines and confusing embassy forms with our direct digital check.'
+    ]
+  },
+
+  // Sweden
+  {
+    id: 'se-archipelagos-midnight-sun',
+    title: 'Sweden – Archipelagos and the Midnight Sun',
+    subtitle: 'Gamla Stan alleys and Stockholm\'s island sanctuary',
+    excerpt: 'Sweden offers a deeply romantic escape for those whose souls crave wild, untamed nature balanced by exceptionally clean, historic design—pine forests, mirror-like lakes, and a dramatic stone-island coastline.',
+    author: 'Borderly Team',
+    date: 'July 9, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/se_image_1',
+    category: 'Travel',
+    country: { name: 'Sweden', code: 'se' },
+    tags: ['sweden travel', 'stockholm', 'archipelago', 'midnight sun', 'schengen'],
+    content: [
+      'Sweden offers a deeply romantic escape for those whose souls crave wild, untamed nature balanced by exceptionally clean, historic design. It is a land of massive pine forests, thousands of mirror-like lakes, and a dramatic coastline of smooth stone islands.',
+      'In Stockholm, wander through the winding, golden-hued alleys of Gamla Stan (the Old Town), where centuries-old stone buildings lean gently toward one another. In the summer months, escape into the Stockholm Archipelago—a sprawling collection of over 30,000 islands—where you can rent a private red wooden cabin, watch the midnight sun paint the sky in pastel hues for hours, and enjoy a traditional lakeside sauna under the stars.',
+      'Find your sanctuary in the wilds of Sweden. Use our interactive multi-step interface to map out your details frictionlessly.'
+    ]
+  },
+
+  // Norway
+  {
+    id: 'no-fjords-emerald',
+    title: 'Norway – Fjords of Deep Emerald and Midnight Gold',
+    subtitle: 'Geirangerfjord waterfalls and Lofoten auroras',
+    excerpt: 'Norway is a landscape of myth and monumental scale, carved by ancient glaciers into steep mountains that drop vertically into the deep, emerald waters of silent fjords.',
+    author: 'Borderly Team',
+    date: 'July 11, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/no_image_1',
+    category: 'Travel',
+    country: { name: 'Norway', code: 'no' },
+    tags: ['norway travel', 'fjords', 'lofoten', 'northern lights', 'schengen'],
+    content: [
+      'Norway is a landscape of myth and monumental scale, carved by ancient glaciers into steep, dramatic mountains that drop vertically into the deep, emerald waters of the silent fjords. It is a place that evokes a raw, awe-inspiring sense of wonder.',
+      'Imagine standing on the deck of a boat drifting through the Geirangerfjord, surrounded by towering rock walls and cascading waterfalls like the Seven Sisters tumbling down around you. In the winter, journey north to the Arctic Circle to the Lofoten Islands, where dramatic peak-side fishing villages sit beneath the dancing, ethereal curtains of the Northern Lights. Norway is a powerful, primal backdrop for an unforgettable shared adventure.',
+      'Witness the majestic fjords of Norway. Let our back-end code process your Schengen itinerary requirements while you pack your winter coat.'
+    ]
+  },
+
+  // Finland
+  {
+    id: 'fi-winter-wonderland',
+    title: 'Finland – A Winter Wonderland of Ice and Fire',
+    subtitle: 'Glass igloos, husky sleds, and Finnish saunas',
+    excerpt: 'Finland is a country of magical contrasts, defined by pristine deep winters and endless sun-drenched summer lakes—an intimate paradise for travelers who find romance in the crisp elements of the far north.',
+    author: 'Borderly Team',
+    date: 'July 13, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/fi_image_1',
+    category: 'Travel',
+    country: { name: 'Finland', code: 'fi' },
+    tags: ['finland travel', 'lapland', 'aurora', 'sauna', 'schengen'],
+    content: [
+      'Finland is a country of magical contrasts, defined by its pristine, deep winters and its endless, sun-drenched summer lakes. It is an intimate paradise for travelers who find romance in the crisp, clean elements of the far north.',
+      'In Finnish Lapland, winter dreams come to life. Imagine sleeping in a luxury glass igloo, looking up through the transparent ceiling as the Aurora Borealis dances across the dark arctic sky while you lie warm in bed. Spend your days being pulled through snow-laden pine forests by a team of huskies, before returning to your private lodge to experience an authentic, candlelit Finnish sauna. Finland offers an ethereal, pristine escape unlike anywhere else on earth.',
+      'Escape to the snows of Finland. Our smart platform automatically manages the strict financial means checks required for Schengen entries.'
+    ]
+  },
+
+  // Iceland
+  {
+    id: 'is-volcanic-fire-ice',
+    title: 'Iceland – Volcanic Fire and Glacial Ice',
+    subtitle: 'Blue Lagoon warmth and Golden Circle waterfalls',
+    excerpt: 'Iceland is a dramatic world in active creation—where black sand beaches meet Atlantic waves, geothermal rivers cut through green valleys, and blue glaciers sit atop active volcanoes.',
+    author: 'Borderly Team',
+    date: 'July 15, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/is_image_1',
+    category: 'Travel',
+    country: { name: 'Iceland', code: 'is' },
+    tags: ['iceland travel', 'blue lagoon', 'golden circle', 'northern lights', 'schengen'],
+    content: [
+      'Iceland is a dramatic world in active creation. It is a landscape where black sand beaches are pounded by fierce Atlantic waves, smoking geothermal rivers cut through bright green valleys, and massive blue glaciers sit atop active volcanoes.',
+      'The romance of Iceland is found in its raw, dramatic landscapes. Imagine soaking together in the milky-blue, mineral-rich warm waters of the Blue Lagoon while crisp, cold air swirls around you. Drive the Golden Circle to stand before roaring waterfalls like Seljalandsfoss, where you can actually walk behind the thundering wall of water as the sun dips below the horizon. Iceland is an exhilarating, cinematic wonderland made for adventurous hearts.',
+      'Embark on an epic Icelandic road trip. Don\'t let documentation hold you back—use our fast passport scanner to secure your slot.'
+    ]
+  },
+
+  // Estonia
+  {
+    id: 'ee-medieval-steeples',
+    title: 'Estonia – Medieval Steeples and Baltic Breezes',
+    subtitle: 'Tallinn\'s Old Town and storybook winter markets',
+    excerpt: 'Estonia is a fascinating intersection where northern European charm meets Baltic history—home to arguably the most intact medieval heart in all of Europe.',
+    author: 'Borderly Team',
+    date: 'July 17, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/ee_image_1',
+    category: 'Travel',
+    country: { name: 'Estonia', code: 'ee' },
+    tags: ['estonia travel', 'tallinn', 'baltic', 'medieval', 'schengen'],
+    content: [
+      'Estonia is a fascinating intersection where northern European charm meets Baltic history. Its capital, Tallinn, possesses arguably the most intact and pristine medieval heart in all of Europe, making it a dream destination for history enthusiasts.',
+      'To enter Tallinn\'s Old Town is to step through a time portal. Thick stone walls, heavy defense towers, and winding cobblestone lanes lead you up to Toompea Hill. From here, look out over a forest of red-tiled roofs, Gothic steeples, and the glittering expanse of the Baltic Sea. In the winter, the square transforms into a cozy, snow-dusted Christmas market that feels lifted straight from a classic storybook.',
+      'Step into the fairy tale of Estonia. Complete your application using our saved-progress feature, allowing you to finish whenever you are ready.'
+    ]
+  },
+
+  // Latvia
+  {
+    id: 'lv-art-nouveau-coasts',
+    title: 'Latvia – Art Nouveau and Wild Coastal Forests',
+    subtitle: 'Riga\'s architectural soul and Jūrmala beaches',
+    excerpt: 'Latvia is a country of deep green spaces, pristine white-sand Baltic coastlines, and an architectural heritage that boasts a vibrant, artistic soul.',
+    author: 'Borderly Team',
+    date: 'July 19, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/lv_image_1',
+    category: 'Travel',
+    country: { name: 'Latvia', code: 'lv' },
+    tags: ['latvia travel', 'riga', 'jurmala', 'art nouveau', 'schengen'],
+    content: [
+      'Latvia is a country of deep, untamed green spaces, pristine white-sand coastlines along the Baltic Sea, and an architectural heritage that boasts a vibrant, artistic soul.',
+      'The historic capital of Riga is split into two distinct chapters of romance. On one side lies its charming medieval Old Town; on the other sits the world\'s finest collection of Art Nouveau architecture, featuring buildings adorned with intricate stone faces, floral motifs, and flowing lines. Just a short train ride away lies Jūrmala, a coastal resort town lined with historic wooden summer houses nestled inside dense pine forests that lead directly to miles of quiet beach.',
+      'Discover the hidden culture of Latvia. Our intelligent form validation makes errors a thing of the past, ensuring a smooth approval journey.'
+    ]
+  },
+
+  // Lithuania
+  {
+    id: 'lt-lakeside-castles',
+    title: 'Lithuania – Lakeside Castles and Shifting Dunes',
+    subtitle: 'Trakai Island Castle and Baltic folklore',
+    excerpt: 'Lithuania is a land steeped in ancient Baltic folklore, rolling green hills, and exceptional lakeside retreats that offer deep peace and romantic isolation.',
+    author: 'Borderly Team',
+    date: 'July 21, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/lt_image_1',
+    category: 'Travel',
+    country: { name: 'Lithuania', code: 'lt' },
+    tags: ['lithuania travel', 'trakai', 'vilnius', 'baltic', 'schengen'],
+    content: [
+      'Lithuania is a land steeped in ancient Baltic folklore, rolling green hills, and exceptional lakeside retreats that offer deep peace and romantic isolation.',
+      'The crown jewel of Lithuanian romance is Trakai Island Castle. Situated just outside Vilnius, this magnificent red-brick fortress sits on its own small island in the center of a calm, glassy lake, connected to the shore by a long wooden footbridge. In the summer, you can rent a rowboat to drift around the castle walls; in the winter, the lake freezes solid, turning the entire landscape into an enchanting ice kingdom.',
+      'Explore the lakes and legends of Lithuania. Our automated checkout calculates all fees transparently, leaving you with zero surprises.'
+    ]
+  },
+
+  // Slovenia
+  {
+    id: 'si-emerald-lake-bled',
+    title: 'Slovenia – The Emerald Waters of Lake Bled',
+    subtitle: 'Alpine lakes, island churches, and cliff-top castles',
+    excerpt: 'Slovenia is a compact, eco-friendly green paradise tucked between the Alps and the Mediterranean—capturing the best of Europe\'s natural wonders within intimate borders.',
+    author: 'Borderly Team',
+    date: 'July 23, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/si_image_1',
+    category: 'Travel',
+    country: { name: 'Slovenia', code: 'si' },
+    tags: ['slovenia travel', 'lake bled', 'alps', 'romance', 'schengen'],
+    content: [
+      'Slovenia is a compact, eco-friendly green paradise tucked quietly between the Alps and the Mediterranean. It is a destination that captures the absolute best of Europe\'s natural wonders within its intimate borders.',
+      'Lake Bled is the symbol of Slovenian romance. Picture a pristine, emerald-green alpine lake surrounded by snow-capped mountain peaks. In the center of the lake sits a tiny, tear-shaped island hosting a beautiful historic church. Travel to the island on a traditional wooden boat (pletna), ring the church\'s wishing bell together, and climb up to Bled Castle, which clings dramatically to a sheer cliff face overlooking the entire valley below.',
+      'Your alpine lake romance is waiting. Let our intuitive digital interface handle your Schengen visa logistics behind the scenes.'
+    ]
+  },
+
+  // Romania
+  {
+    id: 'ro-gothic-castles',
+    title: 'Romania – Gothic Castles and Wild Carpathian Valleys',
+    subtitle: 'Transylvania\'s Peleș Castle and medieval Brașov',
+    excerpt: 'Romania is a land of dramatic sweeping geography, deep cultural traditions, and a historic landscape where time appears to have stood beautifully still.',
+    author: 'Borderly Team',
+    date: 'July 25, 2024',
+    readTime: '5 min read',
+    image: 'https://res.cloudinary.com/drdpxs3je/image/upload/f_auto,q_auto/ro_image_1',
+    category: 'Travel',
+    country: { name: 'Romania', code: 'ro' },
+    tags: ['romania travel', 'transylvania', 'carpathians', 'castles', 'schengen'],
+    content: [
+      'Romania is a land of dramatic, sweeping geography, deep cultural traditions, and a historic landscape where time appears to have stood beautifully still.',
+      'The heart of Romanian romance lies in Transylvania. Imagine driving through the winding, forested mountain passes of the Carpathian Mountains, arriving at Bran Castle or the breathtaking Peleș Castle—a neo-Renaissance masterpiece nestled in the woods. Walk through the beautifully preserved medieval streets of Brașov or Sibiu, where historic houses feature unique roof windows that resemble sleepy eyes watching the cobblestone squares below.',
+      'Journey into the mythic landscapes of Romania. Take advantage of our smart platform\'s OCR scanner to prepare your passport credentials effortlessly.'
+    ]
+  },
 ];
 
 export default blogPosts; 

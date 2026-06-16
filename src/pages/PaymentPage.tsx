@@ -171,12 +171,14 @@ const PaymentPage = () => {
         const amountPence = getVisaApplicationAmountPence(
           destinationCode,
           applicationData,
-          subscriptionTier
+          subscriptionTier,
+          application.nationality_code
         );
         const amount = getVisaApplicationAmountGbp(
           destinationCode,
           applicationData,
-          subscriptionTier
+          subscriptionTier,
+          application.nationality_code
         );
         setAmountGbp(amount);
 

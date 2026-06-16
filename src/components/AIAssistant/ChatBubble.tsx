@@ -208,8 +208,18 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ isLoggedIn, onLoginRequired }) 
         setRemainingMessages(0);
       }
     };
+
+    const handleSubscriptionUpdated = (event: Event) => {
+      const custom = event as CustomEvent<{ tier?: string }>;
+      const tier = custom.detail?.tier || 'free';
+      setSubscriptionTier(tier);
+      setRemainingMessages(getRemainingAiMessages(tier));
+    };
+
     if (isLoggedIn) loadProfile();
-  }, [isLoggedIn]);
+    window.addEventListener('borderly:subscription-updated', handleSubscriptionUpdated);
+    return () => window.removeEventListener('borderly:subscription-updated', handleSubscriptionUpdated);
+  }, [isLoggedIn, isOpen]);
 
   // Save state to localStorage when it changes
   useEffect(() => {

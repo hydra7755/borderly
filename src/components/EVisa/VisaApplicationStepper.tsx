@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, FC } from 'react';
+import React, { useState, useEffect, useRef, FC, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCamera, FaPassport, FaCalendarAlt, FaUsers, FaCreditCard, FaInfoCircle, FaCheckCircle, FaPlane, FaCheck, FaUpload } from 'react-icons/fa';
+import { FaCamera, FaCalendarAlt, FaUsers, FaCreditCard, FaInfoCircle, FaCheckCircle, FaPlane, FaCheck, FaUpload } from 'react-icons/fa';
 import { FaCcVisa, FaCcMastercard, FaCcAmex } from 'react-icons/fa';
 import './VisaApplicationStepper.css';
 import authService from '../../lib/api/auth';
@@ -10,10 +10,58 @@ import {
   getDiscountedServiceFeeGbp,
   getServiceFeeDiscountPercent,
 } from '../../config/visaServiceFee';
+import {
+  calculateSchengenBorderlyTotalGbp,
+  countTravelDays,
+  isUkResident,
+} from '../../config/schengenPricing';
+import SchengenTravelInsuranceAddon from '../VisaEligibility/SchengenTravelInsuranceAddon';
+import EvisaExpressProcessingAddon from '../VisaEligibility/EvisaExpressProcessingAddon';
+import {
+  PassportScanSidebar,
+  PassportScannerPanel,
+  type PassportScanFields,
+} from './PassportScanner';
+import { EVISA_EXPRESS_PROCESSING_FEE_GBP } from '../../config/evisaPricing';
+import { getVisaWizardStepConfig } from '../../utils/visaWizardSteps';
+import {
+  createEmptySchengenData,
+  type SchengenApplicationData,
+} from '../../types/schengenVisa';
+import {
+  validateSchengenCheckoutStep,
+  validateSchengenPersonalStep,
+  validateSchengenTravelersStep,
+  validateSchengenTravelStep,
+  type SchengenValidationErrors,
+} from '../../validation/schengenVisaSchema';
+import { SchengenPassportVerificationFields } from './schengen/SchengenPassportVerificationFields';
+import { SchengenPersonalProfessionalStep } from './schengen/SchengenPersonalProfessionalStep';
+import { SchengenTravelDetailsExtension } from './schengen/SchengenTravelDetailsExtension';
+import { SchengenTravelersExemptions } from './schengen/SchengenTravelersExemptions';
+import { SchengenCheckoutLegal } from './schengen/SchengenCheckoutLegal';
+import { createEmptyUsData, type UsApplicationData } from '../../types/usVisa';
+import { validateUsSubStep, type UsValidationErrors } from '../../validation/usVisaSchema';
+import { UsPassportBioFields } from './us/UsPassportBioFields';
+import { UsContactSocialPanel } from './us/UsContactSocialPanel';
+import { UsTravelPanel } from './us/UsTravelPanel';
+import { UsFamilyPanel } from './us/UsFamilyPanel';
+import { UsWorkEducationPanel } from './us/UsWorkEducationPanel';
+import { UsTravelersCompanionsPanel } from './us/UsTravelersCompanionsPanel';
+import { UsCheckoutPanel } from './us/UsCheckoutPanel';
+import {
+  evaluateVisaRouting,
+  isFieldWaived,
+  parseEligibilityFromSearchParams,
+} from '../../engine/visaRoutingEngine';
+import type { VisaRoutingResult } from '../../types/visaRouting';
 
 interface VisaApplicationStepperProps {
   onComplete?: (data: FormData) => void;
   destinationCode?: string;
+  nationalityCode?: string;
+  searchParams?: string;
+  routingResult?: VisaRoutingResult | null;
 }
 
 interface PassportData {
@@ -59,136 +107,62 @@ interface FormData {
   flightTickets: string | null;
   travelers: Traveler[];
   paymentDetails: null;
+  schengen: SchengenApplicationData | null;
+  us: UsApplicationData | null;
+  schengenAddons?: {
+    travelInsurance: boolean;
+  };
+  eligibility?: {
+    residenceCountry: string | null;
+    residenceMode: 'home' | 'abroad';
+    passportNationality: string;
+    heldPremiumVisas: string[];
+  };
+  evisaAddons?: {
+    expressProcessing: boolean;
+  };
 }
-
-interface OcrResult {
-  ocrText: string | null;
-}
-
-// Placeholder for the actual OCR function - replace with your implementation
-const performOcr = async (file: File): Promise<OcrResult> => {
-  console.log("[OCR] Starting performOcr..."); // Log start
-  const apiKey = import.meta.env.VITE_GOOGLE_VISION_API_KEY;
-
-  if (!apiKey) {
-    console.error("[OCR Error] Google Vision API Key not found in environment variables (VITE_GOOGLE_VISION_API_KEY)");
-    return { ocrText: null };
-  }
-  console.log("[OCR] API Key loaded."); // Log key confirmation
-
-  try {
-    // Read the file as base64
-    console.log("[OCR] Reading file as base64...");
-    const reader = new FileReader();
-    const readFileAsBase64 = (file: File): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        reader.onload = () => {
-          const base64String = (reader.result as string).split(',')[1];
-          if (!base64String) {
-             console.error("[OCR Error] Failed to extract base64 content from file reader result.");
-             return reject(new Error("Failed to read file as base64 content."));
-          }
-          console.log("[OCR] File read as base64 successfully (length snippet):", base64String.substring(0,30) + '...');
-          resolve(base64String);
-        };
-        reader.onerror = (error) => {
-           console.error("[OCR Error] FileReader error:", error);
-           reject(error);
-        };
-        reader.readAsDataURL(file);
-      });
-    };
-
-    const base64Image = await readFileAsBase64(file);
-
-    const requestBody = {
-      requests: [
-        {
-          image: {
-            content: base64Image,
-          },
-          features: [
-            {
-              type: 'DOCUMENT_TEXT_DETECTION',
-              maxResults: 1, // Keep maxResults if you only need the first page/document representation
-            },
-          ],
-        },
-      ],
-    };
-
-    const apiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
-    console.log(`[OCR] Making fetch request to: ${apiUrl}`);
-    console.log("[OCR] Request body (image content omitted for brevity):", JSON.stringify({...requestBody, requests: [{...requestBody.requests[0], image: {content: '...'}}]} ));
-
-    const response = await fetch(
-      apiUrl,
-      {
-        method: 'POST',
-        body: JSON.stringify(requestBody),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    console.log(`[OCR] Received response status: ${response.status}`); // Log status
-
-    const responseBody = await response.text(); // Read response body as text first for debugging
-    
-    if (!response.ok) {
-      console.error(`[OCR Error] Google Vision API request failed with status ${response.status}. Response body:`, responseBody);
-      throw new Error(`API Error: ${response.statusText}`);
-    }
-    
-    console.log("[OCR] API Response Body:", responseBody); // Log the full response body
-
-    const data = JSON.parse(responseBody); // Parse JSON only after logging
-
-    // Extract the full text annotation
-    const detection = data.responses?.[0]?.fullTextAnnotation;
-    const ocrText = detection ? detection.text : null;
-    
-    if (ocrText) {
-       console.log("[OCR] Full text annotation found (snippet):", ocrText.substring(0, 100) + '...');
-    } else {
-       console.warn("[OCR] No fullTextAnnotation found in the API response.", data.responses?.[0]);
-    }
-
-    return { ocrText };
-
-  } catch (error) {
-    console.error("[OCR Error] Error during performOcr execution:", error);
-    return { ocrText: null }; // Return null on any error
-  }
-};
-
-// Placeholder for the function that parses OCR text into PassportData
-const parseOcrText = (text: string | null): Partial<PassportData> => {
-  // Log the raw text for debugging - implement parsing based on this structure
-  console.log("Raw OCR Text to Parse:", text);
-  
-  if (!text) return {};
-  console.warn("Placeholder parseOcrText called. Implement actual parsing logic based on logged raw text.");
-  // Add logic here to parse the OCR text and extract passport fields
-  // Example (highly dependent on OCR output format):
-  const extracted: Partial<PassportData> = {};
-  // try {
-  //   extracted.lastName = text.match(/Surname\s*:\s*(\w+)/i)?.[1];
-  //   extracted.firstName = text.match(/Given Names\s*:\s*(\w+)/i)?.[1];
-  //   extracted.passportNumber = text.match(/Passport No\.\s*:\s*(\w+)/i)?.[1];
-  //   // ... add more parsing rules based on observed OCR output ...
-  // } catch (e) {
-  //   console.error("Error during OCR text parsing:", e);
-  // }
-  return extracted;
-};
 
 const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
   onComplete,
   destinationCode = 'tr',
+  nationalityCode,
+  searchParams,
+  routingResult: routingResultProp,
 }) => {
+  const stepConfig = getVisaWizardStepConfig(destinationCode);
+
+  const resolvedRouting = useMemo(() => {
+    if (routingResultProp) return routingResultProp;
+    if (!nationalityCode) return null;
+    const eligibility = parseEligibilityFromSearchParams(
+      nationalityCode,
+      searchParams ?? (typeof window !== 'undefined' ? window.location.search : '')
+    );
+    return evaluateVisaRouting(destinationCode, eligibility);
+  }, [routingResultProp, nationalityCode, searchParams, destinationCode]);
+
+  const waivedFormFields = resolvedRouting?.waivedFormFields ?? [];
+  const {
+    isSchengen,
+    isUnitedStates: isUs,
+    steps,
+    totalSteps,
+    photoStep,
+    passportStep,
+    personalStep,
+    travelStep,
+    travelersStep,
+    checkoutStep,
+    usPassportSubSteps,
+    usTravelSubSteps,
+  } = stepConfig;
+
   const [currentStep, setCurrentStep] = useState(1);
+  const [schengenErrors, setSchengenErrors] = useState<SchengenValidationErrors>({});
+  const [usErrors, setUsErrors] = useState<UsValidationErrors>({});
+  const [usPassportSubStep, setUsPassportSubStep] = useState(0);
+  const [usTravelSubStep, setUsTravelSubStep] = useState(0);
   const [currentSamplePhoto, setCurrentSamplePhoto] = useState<'male' | 'female'>('female');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -197,10 +171,6 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [passportImage, setPassportImage] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const passportVideoRef = useRef<HTMLVideoElement | null>(null);
-  const passportStreamRef = useRef<MediaStream | null>(null);
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [isCheckingFace, setIsCheckingFace] = useState(false);
@@ -208,13 +178,15 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingStep, setPendingStep] = useState<number | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
-  const [isPassportScannerReady, setIsPassportScannerReady] = useState(false);
   const [isEditingPassportData, setIsEditingPassportData] = useState(false);
   const [currentTravelerIndex, setCurrentTravelerIndex] = useState<number | null>(null);
   const [processingTraveler, setProcessingTraveler] = useState(false);
   const [travelerStep, setTravelerStep] = useState<number>(1);
   const MAX_TRAVELERS = 10;
   const [subscriptionTier, setSubscriptionTier] = useState<string>('free');
+  const [profileResidency, setProfileResidency] = useState<string | null>(null);
+  const [addTravelInsurance, setAddTravelInsurance] = useState(false);
+  const [addExpressProcessing, setAddExpressProcessing] = useState(false);
   
   // Add effect to alternate photos every 5 seconds
   useEffect(() => {
@@ -246,26 +218,6 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
     };
   }, [currentStep]);
 
-  // Update useEffect for passport scanner element
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    
-    if (currentStep === 2) {
-      // Just ensure DOM is ready
-      timer = setTimeout(() => {
-        setIsPassportScannerReady(true);
-      }, 500);
-    } else {
-      setIsPassportScannerReady(false);
-      // Cleanup scanner when leaving the step
-      stopPassportScanner();
-    }
-    
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [currentStep]);
-
   // Add effect to fetch user subscription tier
   useEffect(() => {
     const fetchUserSubscription = async () => {
@@ -273,6 +225,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
         const { profile } = await userProfileService.getCurrentUserProfile();
         if (profile) {
           setSubscriptionTier(profile.subscription_tier || 'free');
+          setProfileResidency(profile.residency ?? null);
         }
       } catch (error) {
         console.error('Error fetching user subscription:', error);
@@ -281,19 +234,22 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
     
     fetchUserSubscription();
   }, []);
-  
-  const visaFeePerTraveler = getVisaFeeForCountryCode(destinationCode);
 
-  const getServiceFee = (): number => {
-    const discountPercentage = getServiceFeeDiscountPercent(subscriptionTier);
-    return getDiscountedServiceFeeGbp(discountPercentage);
-  };
+  useEffect(() => {
+    if (!isSchengen) return;
+    const params = new URLSearchParams(
+      searchParams ?? (typeof window !== 'undefined' ? window.location.search : '')
+    );
+    setAddTravelInsurance(params.get('addTravelInsurance') === '1');
+  }, [isSchengen, searchParams]);
 
-  const getTotalFee = (): number => {
-    const travelerCount = formData.travelers.length + 1;
-    const serviceFee = getServiceFee();
-    return Number((visaFeePerTraveler * travelerCount + serviceFee).toFixed(2));
-  };
+  useEffect(() => {
+    if (isSchengen || isUs) return;
+    const params = new URLSearchParams(
+      searchParams ?? (typeof window !== 'undefined' ? window.location.search : '')
+    );
+    setAddExpressProcessing(params.get('addExpressProcessing') === '1');
+  }, [isSchengen, isUs, searchParams]);
 
   const [formData, setFormData] = useState<FormData>({
     photo: null,
@@ -311,41 +267,121 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
     },
     flightTickets: null,
     travelers: [],
-    paymentDetails: null
+    paymentDetails: null,
+    schengen: isSchengen ? createEmptySchengenData() : null,
+    us: isUs ? createEmptyUsData() : null,
   });
 
-  const steps = [
-    {
-      id: 1,
-      title: 'Photo',
-      icon: FaCamera,
-      description: 'Take or upload your photo'
-    },
-    {
-      id: 2,
-      title: 'Passport',
-      icon: FaPassport,
-      description: 'Scan your passport'
-    },
-    {
-      id: 3,
-      title: 'Travel Details',
-      icon: FaCalendarAlt,
-      description: 'Enter travel dates'
-    },
-    {
-      id: 4,
-      title: 'Travelers',
-      icon: FaUsers,
-      description: 'Add additional travelers'
-    },
-    {
-      id: 5,
-      title: 'Checkout',
-      icon: FaCreditCard,
-      description: 'Complete payment'
+  const eligibilityContext = useMemo(() => {
+    if (!nationalityCode) return null;
+    return parseEligibilityFromSearchParams(
+      nationalityCode,
+      searchParams ?? (typeof window !== 'undefined' ? window.location.search : '')
+    );
+  }, [nationalityCode, searchParams]);
+
+  const ukResidentForInsurance = isUkResident(
+    eligibilityContext?.residenceCountry ?? profileResidency,
+    eligibilityContext?.residenceMode ?? 'home',
+    nationalityCode || ''
+  );
+
+  const travelDays = countTravelDays(
+    formData.travelDates.arrival,
+    formData.travelDates.departure
+  );
+
+  const getSchengenPricing = () =>
+    calculateSchengenBorderlyTotalGbp({
+      travelerCount: formData.travelers.length + 1,
+      discountPercent: getServiceFeeDiscountPercent(subscriptionTier),
+      addTravelInsurance: addTravelInsurance && ukResidentForInsurance,
+      travelDays: travelDays || 1,
+      isUkResident: ukResidentForInsurance,
+    });
+
+  const visaFeePerTraveler = isSchengen ? 0 : getVisaFeeForCountryCode(destinationCode);
+
+  const getServiceFee = (): number => {
+    if (isSchengen) return getSchengenPricing().serviceFee;
+    return getDiscountedServiceFeeGbp(getServiceFeeDiscountPercent(subscriptionTier));
+  };
+
+  const isEvisaApplication = !isSchengen && !isUs;
+
+  const getTotalFee = (): number => {
+    if (isSchengen) return getSchengenPricing().total;
+    const travelerCount = formData.travelers.length + 1;
+    let total = visaFeePerTraveler * travelerCount + getServiceFee();
+    if (addExpressProcessing && isEvisaApplication) {
+      total += EVISA_EXPRESS_PROCESSING_FEE_GBP;
     }
-  ];
+    return Number(total.toFixed(2));
+  };
+
+  const updateUs = (updater: (prev: UsApplicationData) => UsApplicationData) => {
+    setFormData((prev) => ({
+      ...prev,
+      us: updater(prev.us ?? createEmptyUsData()),
+    }));
+  };
+
+  const validateCurrentUsFlow = (): boolean => {
+    if (!isUs || !formData.us) return true;
+    let subStep: Parameters<typeof validateUsSubStep>[0];
+    if (currentStep === passportStep) {
+      subStep = usPassportSubStep === 0 ? 'passport' : 'contact';
+    } else if (currentStep === travelStep) {
+      subStep = usTravelSubStep === 0 ? 'travel' : usTravelSubStep === 1 ? 'family' : 'work';
+    } else if (currentStep === travelersStep) {
+      subStep = 'travelers';
+    } else if (currentStep === checkoutStep) {
+      subStep = 'checkout';
+    } else {
+      return true;
+    }
+    const errors = validateUsSubStep(subStep, formData.us);
+    setUsErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const updateSchengen = (
+    updater: (prev: SchengenApplicationData) => SchengenApplicationData
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      schengen: updater(prev.schengen ?? createEmptySchengenData()),
+    }));
+  };
+
+  const validateCurrentSchengenStep = (step: number): boolean => {
+    if (!isSchengen || !formData.schengen) return true;
+    let errors: SchengenValidationErrors = {};
+
+    if (personalStep !== null && step === personalStep) {
+      errors = validateSchengenPersonalStep(formData.schengen);
+    } else if (step === travelStep) {
+      errors = validateSchengenTravelStep(
+        formData.schengen,
+        formData.accommodation.name,
+        formData.accommodation.address,
+        formData.travelDates.arrival,
+        formData.travelDates.departure,
+        waivedFormFields
+      );
+    } else if (step === travelersStep) {
+      errors = validateSchengenTravelersStep(
+        formData.schengen,
+        formData.passportData?.dateOfBirth,
+        waivedFormFields
+      );
+    } else if (step === checkoutStep) {
+      errors = validateSchengenCheckoutStep(formData.schengen);
+    }
+
+    setSchengenErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleNext = () => {
     // If we're processing a specific traveler
@@ -353,6 +389,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
       if (travelerStep === 1) {
         // Photo completed, move to passport
         setTravelerStep(2);
+        setIsEditingPassportData(false);
         
         // Reset passport data to avoid showing previous traveler's data
         setPassportImage(null);
@@ -379,13 +416,31 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
         }));
         
         // Switch to travelers step, skip travel details for additional travelers
-        setCurrentStep(4);
+        setCurrentStep(travelersStep);
+        return;
+      }
+    }
+
+    if (isSchengen && !validateCurrentSchengenStep(currentStep)) {
+      return;
+    }
+
+    if (isUs && formData.us) {
+      if (!validateCurrentUsFlow()) return;
+      if (currentStep === passportStep && usPassportSubStep < usPassportSubSteps - 1) {
+        setUsPassportSubStep(usPassportSubStep + 1);
+        return;
+      }
+      if (currentStep === travelStep && usTravelSubStep < usTravelSubSteps - 1) {
+        setUsTravelSubStep(usTravelSubStep + 1);
         return;
       }
     }
     
     // Normal flow for main applicant
-    if (currentStep < steps.length) {
+    if (currentStep < totalSteps) {
+      if (isUs && currentStep === passportStep) setUsPassportSubStep(0);
+      if (isUs && currentStep === travelStep) setUsTravelSubStep(0);
       handleStepTransition(currentStep + 1);
     }
   };
@@ -401,6 +456,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
         setProcessingTraveler(false);
         setCurrentTravelerIndex(null);
         setTravelerStep(1);
+        setIsEditingPassportData(false);
         setCapturedImage(null);
         setFormData(prev => ({
           ...prev,
@@ -412,9 +468,22 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
       }
     }
     
+    // US sub-wizard back navigation within main steps
+    if (isUs && currentStep === passportStep && usPassportSubStep > 0) {
+      setUsPassportSubStep(usPassportSubStep - 1);
+      return;
+    }
+    if (isUs && currentStep === travelStep && usTravelSubStep > 0) {
+      setUsTravelSubStep(usTravelSubStep - 1);
+      return;
+    }
+
     // Normal back flow
     if (currentStep > 1) {
-      handleStepTransition(currentStep - 1);
+      const prevStep = currentStep - 1;
+      if (isUs && prevStep === passportStep) setUsPassportSubStep(usPassportSubSteps - 1);
+      if (isUs && prevStep === travelStep) setUsTravelSubStep(usTravelSubSteps - 1);
+      handleStepTransition(prevStep);
     }
   };
 
@@ -787,381 +856,32 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
     }
   };
 
-  // Passport scanner functionality
-  const extractPassportData = async (file: File): Promise<{ success: boolean, data: Partial<PassportData>, file: File }> => {
-    try {
-      // Attempt OCR using the placeholder function
-      // Note: setPassportImage should likely be called elsewhere if it's just for display
-      const result: OcrResult = await performOcr(file); // Call the async OCR function
+  const handlePassportImageChange = (image: string | null) => {
+    setPassportImage(image);
+    setFormData((prev) => ({ ...prev, passportImage: image }));
+  };
 
-      if (result && result.ocrText) {
-        // Parse the OCR text using the placeholder function
-        const extractedData: Partial<PassportData> = parseOcrText(result.ocrText);
-        return {
-          success: true,
-          data: extractedData || {}, // Ensure data is always an object
-          file: file
-        };
-      } else {
-        // OCR failed or produced no text, but we'll still proceed with the file
-        console.warn("OCR produced no text or failed, but continuing with upload");
-        return {
-          success: true,
-          data: {}, // Return empty data
-          file: file
-        };
-      }
-    } catch (error) {
-      console.error("OCR processing error in extractPassportData:", error);
-      // Return success anyway with empty data - we'll just proceed with the file
-      return {
-        success: true,
-        data: {},
-        file: file
+  const handlePassportDataChange = (data: PassportScanFields | null) => {
+    setFormData((prev) => {
+      const next: FormData = {
+        ...prev,
+        passportData: data,
       };
-    }
-  };
 
-  const startPassportScanner = async () => {
-    setScanError(null);
-    setIsProcessing(true);
-    
-    try {
-      // Check if browser supports getUserMedia
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Your browser doesn't support camera access");
-      }
-      
-      // Stop any existing stream first
-      if (passportStreamRef.current) {
-        passportStreamRef.current.getTracks().forEach(track => track.stop());
-        passportStreamRef.current = null;
-      }
-      
-      console.log("Starting passport scanner...");
-      
-      // Get camera stream with specific constraints for better results
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      });
-      
-      console.log("Passport scanner stream obtained");
-      
-      // Check if we have a valid video element
-      if (!passportVideoRef.current) {
-        throw new Error("Video element not found");
-      }
-      
-      // Store the stream reference
-      passportStreamRef.current = stream;
-      
-      // Apply stream to video element
-      passportVideoRef.current.srcObject = stream;
-      
-      // Ensure video plays
-      try {
-        await passportVideoRef.current.play();
-        console.log("Passport video playback started successfully");
-      } catch (playError) {
-        console.error("Error playing passport video:", playError);
-        throw new Error("Could not start video playback");
-      }
-      
-    } catch (error) {
-      console.error("Passport scanner initialization error:", error);
-      let errorMsg = "Unable to access camera. ";
-      
-      if (error instanceof Error) {
-        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
-          errorMsg += "Camera access was denied. Please allow camera access and try again.";
-        } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-          errorMsg += "No camera found on your device.";
-        } else {
-          errorMsg += error.message || "Please try again or use the upload option.";
-        }
-      }
-      
-      setScanError(errorMsg);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const stopPassportScanner = () => {
-    if (passportStreamRef.current) {
-      passportStreamRef.current.getTracks().forEach(track => track.stop());
-      passportStreamRef.current = null;
-    }
-    
-    if (passportVideoRef.current) {
-      passportVideoRef.current.srcObject = null;
-    }
-  };
-
-  const capturePassport = async () => {
-    if (!passportVideoRef.current) return;
-    
-    // Set processing state
-      setIsProcessing(true);
-      
-    try {
-      // Capture from video
-      const canvas = document.createElement('canvas');
-      const video = passportVideoRef.current;
-      
-      // Match canvas dimensions to video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      // Draw video frame to canvas
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Get data URL and create File object
-      const dataUrl = canvas.toDataURL('image/jpeg');
-      const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], "passport-scan.jpg", { type: 'image/jpeg' });
-      
-      // Set the preview image
-      setPassportImage(dataUrl);
-      
-      // Stop the camera
-      stopPassportScanner();
-      
-      try {
-        // Try to extract passport data but don't block if it fails
-        const extractionResult = await extractPassportData(file);
-        
-        // Define empty passport data structure within this scope for merging
-        const emptyPassportDataForMerge: PassportData = {
-          firstName: '', lastName: '', nationality: '', dateOfBirth: '', placeOfBirth: '', passportNumber: '', issueDate: '', expiryDate: '', sex: '', issuingAuthority: ''
-        };
-
-        if (extractionResult.success && extractionResult.data) {
-          // Ensure the extracted data conforms to PassportData by merging
-          const completeData: PassportData = { ...emptyPassportDataForMerge, ...extractionResult.data };
-          
-          // Update form data with the complete data
-          setFormData(prev => ({
-            ...prev,
-            passportImage: dataUrl,
-            passportData: completeData // Use the merged, complete data
-          }));
-          
-          // Update traveler data if processing additional traveler
-          if (processingTraveler && currentTravelerIndex !== null) {
-            // Correctly update travelers array within formData state
-            setFormData((prev: FormData) => {
-              const updatedTravelers = [...prev.travelers];
-              // Ensure index is valid
-              if (updatedTravelers[currentTravelerIndex]) {
-                  updatedTravelers[currentTravelerIndex].passportData = completeData; // Use the merged, complete data here too
-                  updatedTravelers[currentTravelerIndex].hasPassportScan = true;
-              }
-              return { ...prev, travelers: updatedTravelers };
-            });
-          }
-        } else {
-          // Create empty passport data
-          const emptyPassportData = {
-            firstName: '',
-            lastName: '',
-            nationality: '',
-            dateOfBirth: '',
-            placeOfBirth: '',
-            passportNumber: '',
-            issueDate: '',
-            expiryDate: '',
-            sex: '',
-            issuingAuthority: ''
+      if (processingTraveler && currentTravelerIndex !== null) {
+        const updatedTravelers = [...prev.travelers];
+        if (updatedTravelers[currentTravelerIndex]) {
+          updatedTravelers[currentTravelerIndex] = {
+            ...updatedTravelers[currentTravelerIndex],
+            passportData: data,
+            hasPassportScan: Boolean(data?.passportNumber),
           };
-          
-          // Update form data with empty passport data
-          setFormData(prev => ({
-            ...prev,
-            passportImage: dataUrl,
-            passportData: emptyPassportData
-          }));
-          
-          // Update traveler data if processing additional traveler
-          if (processingTraveler && currentTravelerIndex !== null) {
-            // Correctly update travelers array within formData state
-            setFormData((prev: FormData) => {
-              const updatedTravelers = [...prev.travelers];
-               // Ensure index is valid
-              if (updatedTravelers[currentTravelerIndex]) {
-                  updatedTravelers[currentTravelerIndex].passportData = emptyPassportData;
-                  updatedTravelers[currentTravelerIndex].hasPassportScan = true;
-              }
-              return { ...prev, travelers: updatedTravelers };
-            });
-          }
-          
-          console.warn("OCR failed, but continuing with uploaded passport image");
         }
-      } catch (error) {
-        console.error("Error extracting passport data:", error);
-        
-        // Create empty passport data with explicit type, removing fullName
-        const emptyPassportData: PassportData = {
-          firstName: '',
-          lastName: '',
-          nationality: '',
-          dateOfBirth: '',
-          placeOfBirth: '',
-          passportNumber: '',
-          issueDate: '',
-          expiryDate: '',
-          sex: '',
-          issuingAuthority: ''
-        };
-        
-        // Update form data with empty passport data
-        setFormData(prev => ({
-          ...prev,
-          passportImage: dataUrl,
-          passportData: emptyPassportData
-        }));
-        
-        // Update traveler data if processing additional traveler
-        if (processingTraveler && currentTravelerIndex !== null) {
-          // Correctly update travelers array within formData state using setFormData
-          setFormData((prev: FormData) => {
-            const updatedTravelers = [...prev.travelers];
-             // Ensure index is valid
-            if (updatedTravelers[currentTravelerIndex]) {
-                updatedTravelers[currentTravelerIndex].passportData = emptyPassportData;
-                updatedTravelers[currentTravelerIndex].hasPassportScan = true;
-            }
-            return { ...prev, travelers: updatedTravelers };
-          });
-        }
-        
-        console.warn("Error in OCR processing, but continuing with uploaded passport image");
+        next.travelers = updatedTravelers;
       }
-    } catch (error) {
-      console.error('Error capturing passport:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
-  const handlePassportUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0]) return;
-    
-    const file = e.target.files[0];
-    console.log(`Uploading passport file: ${file.name}, type: ${file.type}, size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-    
-      setIsProcessing(true);
-      
-    try {
-      // Generate a preview
-      const imageUrl = URL.createObjectURL(file);
-      setPassportImage(imageUrl);
-      
-      // Create empty passport data to ensure we can continue
-      const emptyPassportData = {
-        firstName: '',
-        lastName: '',
-        nationality: '',
-        dateOfBirth: '',
-        placeOfBirth: '',
-        passportNumber: '',
-        issueDate: '',
-        expiryDate: '',
-        sex: '',
-        issuingAuthority: ''
-      };
-      
-      try {
-        // Try to extract data but don't block on failure
-        console.log("Attempting to extract passport data...");
-        const result = await extractPassportData(file);
-        
-        if (result && result.success && Object.keys(result.data).length > 0) {
-          console.log("Successfully extracted passport data");
-          // Use the extracted data, ensuring it conforms to PassportData
-          const completeData: PassportData = { ...emptyPassportData, ...result.data }; 
-          setFormData(prev => ({
-            ...prev,
-            passportImage: imageUrl,
-            passportData: completeData // Correctly use the merged data here
-          }));
-          
-          // Update traveler data if processing additional traveler
-        if (processingTraveler && currentTravelerIndex !== null) {
-            const updatedTravelers = [...formData.travelers];
-            // Ensure index and data are valid before updating
-            if (updatedTravelers[currentTravelerIndex]) {
-                updatedTravelers[currentTravelerIndex].passportData = completeData; // Use the merged data
-                updatedTravelers[currentTravelerIndex].hasPassportScan = true;
-            }
-            
-            setFormData(prev => ({
-              ...prev,
-              travelers: updatedTravelers
-            }));
-          }
-        } else {
-          console.warn("OCR failed to extract data, proceeding with empty data");
-          // Use empty data
-          setFormData(prev => ({
-            ...prev,
-            passportImage: imageUrl,
-            passportData: emptyPassportData // Use the typed empty object
-          }));
-          
-          // Update traveler data if processing additional traveler
-          if (processingTraveler && currentTravelerIndex !== null) {
-            // Correctly update travelers array within formData state
-            setFormData((prev: FormData) => {
-              const updatedTravelers = [...prev.travelers];
-               // Ensure index is valid
-              if (updatedTravelers[currentTravelerIndex]) {
-                  updatedTravelers[currentTravelerIndex].passportData = emptyPassportData;
-                  updatedTravelers[currentTravelerIndex].hasPassportScan = true;
-              }
-              return { ...prev, travelers: updatedTravelers };
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error extracting passport data:", error);
-        
-        // Continue with empty data
-        setFormData(prev => ({
-          ...prev,
-          passportImage: imageUrl,
-          passportData: emptyPassportData // Use the typed empty object
-        }));
-        
-        // Update traveler data if processing additional traveler
-        if (processingTraveler && currentTravelerIndex !== null) {
-          // Correctly update travelers array within formData state using setFormData
-          setFormData((prev: FormData) => {
-            const updatedTravelers = [...prev.travelers];
-             // Ensure index is valid
-            if (updatedTravelers[currentTravelerIndex]) {
-                updatedTravelers[currentTravelerIndex].passportData = emptyPassportData;
-                updatedTravelers[currentTravelerIndex].hasPassportScan = true;
-            }
-            return { ...prev, travelers: updatedTravelers };
-          });
-        }
-        }
-        
-        setScanError(null);
-      
-    } catch (error) {
-      console.error("Error processing passport upload:", error);
-      setScanError("Failed to process passport image. Please try again.");
-    } finally {
-      setIsProcessing(false);
-    }
+      return next;
+    });
   };
 
   // Add handlers for travel details form
@@ -1225,13 +945,6 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
     };
   }, []);
 
-  // Clean up scanner on unmount
-  useEffect(() => {
-    return () => {
-      stopPassportScanner();
-    };
-  }, []);
-
   // Function to confirm step transition
   const confirmStepTransition = () => {
     if (pendingStep !== null) {
@@ -1280,6 +993,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
     setCurrentTravelerIndex(newTravelerIndex);
     setProcessingTraveler(true);
     setTravelerStep(1);
+    setIsEditingPassportData(false);
     
     // Completely clear current data since we're starting fresh
     setCapturedImage(null);
@@ -1313,45 +1027,9 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
     });
   };
 
-  // Function to handle passport data field edits
-  const handlePassportDataEdit = (field: keyof PassportData, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      passportData: prev.passportData ? {
-        ...prev.passportData,
-        [field]: value
-      } : null
-    }));
-  };
-
-  // Add a function to validate passport data
-  const isPassportDataComplete = (): boolean => {
-    if (!formData.passportData) return false;
-    
-    // Check if any required field is empty
-    const requiredFields: (keyof PassportData)[] = [
-      'firstName', 
-      'lastName', 
-      'nationality', 
-      'dateOfBirth', 
-      'placeOfBirth', 
-      'passportNumber', 
-      'issueDate', 
-      'expiryDate', 
-      'sex', 
-      'issuingAuthority'
-    ];
-    
-    return requiredFields.every(field => 
-      formData.passportData && 
-      formData.passportData[field] && 
-      formData.passportData[field].trim() !== ''
-    );
-  };
-
   // Add handleStepTransition function
   const handleStepTransition = (nextStep: number) => {
-    if (nextStep === 2 && currentStep === 1 && formData.photo) {
+    if (nextStep === passportStep && currentStep === photoStep && formData.photo) {
       // For first step, ask for confirmation before proceeding
       setPendingStep(nextStep);
       setShowConfirmModal(true);
@@ -1368,6 +1046,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
     setCurrentTravelerIndex(index);
     setProcessingTraveler(true);
     setTravelerStep(startAtStep);
+    setIsEditingPassportData(false);
     
     // Always completely clear current form data to avoid showing previous data
     setCapturedImage(null);
@@ -1382,8 +1061,35 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
 
   // Fix onComplete function call if needed
   const handleComplete = () => {
+    if (isSchengen && formData.schengen && !validateCurrentSchengenStep(checkoutStep)) {
+      return;
+    }
+    if (isUs && formData.us) {
+      setCurrentStep(checkoutStep);
+      setUsTravelSubStep(0);
+      setUsPassportSubStep(0);
+      const errors = validateUsSubStep('checkout', formData.us);
+      setUsErrors(errors);
+      if (Object.keys(errors).length > 0) return;
+    }
     if (onComplete) {
-      onComplete(formData);
+      onComplete({
+        ...formData,
+        schengenAddons: {
+          travelInsurance: addTravelInsurance && ukResidentForInsurance,
+        },
+        evisaAddons: {
+          expressProcessing: addExpressProcessing && isEvisaApplication,
+        },
+        eligibility: eligibilityContext
+          ? {
+              residenceCountry: eligibilityContext.residenceCountry,
+              residenceMode: eligibilityContext.residenceMode,
+              passportNationality: eligibilityContext.passportNationality,
+              heldPremiumVisas: eligibilityContext.heldPremiumVisas,
+            }
+          : undefined,
+      });
     }
   };
 
@@ -1571,45 +1277,8 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
             </>
           )}
 
-          {(currentStep === 2 || (processingTraveler && travelerStep === 2)) && (
-            <>
-              {/* Scanning Instructions Card */}
-              <div className="bg-white rounded-xl shadow-lg p-5 flex-1">
-                <h3 className="text-lg font-semibold mb-4">Scanning Instructions</h3>
-                <div className="bg-primary-50 p-4 rounded-lg">
-                  <ul className="space-y-3">
-                    <li className="flex items-start">
-                      <FaCheckCircle className="text-primary-600 mt-1 mr-2 flex-shrink-0" />
-                      <span>Place passport on a flat surface</span>
-                    </li>
-                    <li className="flex items-start">
-                      <FaCheckCircle className="text-primary-600 mt-1 mr-2 flex-shrink-0" />
-                      <span>Ensure good lighting</span>
-                    </li>
-                    <li className="flex items-start">
-                      <FaCheckCircle className="text-primary-600 mt-1 mr-2 flex-shrink-0" />
-                      <span>Include entire passport page</span>
-                    </li>
-                    <li className="flex items-start">
-                      <FaCheckCircle className="text-primary-600 mt-1 mr-2 flex-shrink-0" />
-                      <span>Avoid glare or shadows</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Sample Passport Scan Card */}
-              <div className="bg-white rounded-xl shadow-lg p-5">
-                <h3 className="text-lg font-semibold mb-3 text-center">Sample Scan</h3>
-                <div className="aspect-[3/2] bg-gray-100 rounded-lg overflow-hidden">
-                  <img 
-                    src="/images/passport.png" 
-                    alt="Sample passport scan"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-            </>
+          {(currentStep === passportStep || (processingTraveler && travelerStep === 2)) && (
+            <PassportScanSidebar />
           )}
           
           {/* No helper cards for other steps */}
@@ -1780,278 +1449,94 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                 </motion.div>
               )}
 
-              {/* Passport step - main applicant or additional traveler - preserve original dimensions */}
-              {(currentStep === 2 || (processingTraveler && travelerStep === 2)) && (
+              {(currentStep === passportStep || (processingTraveler && travelerStep === 2)) && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="h-full flex flex-col"
+                  className="flex h-full flex-col"
                 >
-                  <h2 className="text-2xl font-bold text-gray-900 text-center mb-6">
-                    {processingTraveler 
-                      ? `Scan Passport for Traveler #${currentTravelerIndex !== null ? currentTravelerIndex + 2 : ''}` 
-                      : 'Scan Your Passport'}
-                  </h2>
-                  
-                  <div className="flex-1 flex flex-col">
-                    {/* Passport data display OR edit form */} 
-                    {formData.passportData && (
-                      <div className="mb-6">
-                        {isEditingPassportData ? (
-                          // -- Edit Form --
-                          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-4">
-                            <div className="flex justify-between items-center mb-2">
-                              <h3 className="text-lg font-semibold text-blue-800">Edit Passport Data</h3>
-                              <button 
-                                onClick={() => setIsEditingPassportData(false)}
-                                className="text-gray-600 hover:text-gray-800 text-sm font-medium flex items-center"
-                              >
-                                <FaCheck className="w-4 h-4 mr-1" />
-                                Done Editing
-                              </button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              {/* Add input fields for each PassportData field */}
-                              {(Object.keys(formData.passportData) as Array<keyof PassportData>).map((key) => (
-                                <div key={key}>
-                                  <label className="block text-sm font-medium text-gray-700 capitalize mb-1">
-                                    {key.replace(/([A-Z])/g, ' $1').trim()} {/* Format label */}
-                                    <span className="text-red-500">*</span>
-                                  </label>
-                                  <input
-                                    type={key.includes('Date') || key === 'dateOfBirth' ? 'date' : 'text'} // Use date input for date fields
-                                    value={formData.passportData![key]} // Use non-null assertion
-                                    onChange={(e) => handlePassportDataEdit(key, e.target.value)}
-                                    className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                    required
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          // -- Read-only Display --
-                          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                            <div className="flex justify-between items-center mb-2">
-                              <h3 className="text-lg font-semibold text-green-800">Passport Data Extracted</h3>
-                              <button 
-                                onClick={() => setIsEditingPassportData(true)}
-                                className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center"
-                              >
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                                Edit
-                              </button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3 text-sm">
-                                <div>
-                                <p className="text-gray-600">Name: <span className="text-red-500">*</span></p>
-                                <p className={`font-medium ${!formData.passportData.firstName || !formData.passportData.lastName ? 'text-red-500' : ''}`}>
-                                  {formData.passportData.firstName && formData.passportData.lastName 
-                                    ? `${formData.passportData.firstName} ${formData.passportData.lastName}`
-                                    : 'Required'}
-                                </p>
-                                </div>
-                                <div>
-                                <p className="text-gray-600">Passport No: <span className="text-red-500">*</span></p>
-                                <p className={`font-medium ${!formData.passportData.passportNumber ? 'text-red-500' : ''}`}>
-                                  {formData.passportData.passportNumber || 'Required'}
-                                </p>
-                                </div>
-                                <div>
-                                <p className="text-gray-600">Nationality: <span className="text-red-500">*</span></p>
-                                <p className={`font-medium ${!formData.passportData.nationality ? 'text-red-500' : ''}`}>
-                                  {formData.passportData.nationality || 'Required'}
-                                </p>
-                                </div>
-                                <div>
-                                <p className="text-gray-600">Date of Birth: <span className="text-red-500">*</span></p>
-                                <p className={`font-medium ${!formData.passportData.dateOfBirth ? 'text-red-500' : ''}`}>
-                                  {formData.passportData.dateOfBirth || 'Required'}
-                                </p>
-                                </div>
-                                <div>
-                                <p className="text-gray-600">Expiry Date: <span className="text-red-500">*</span></p>
-                                <p className={`font-medium ${!formData.passportData.expiryDate ? 'text-red-500' : ''}`}>
-                                  {formData.passportData.expiryDate || 'Required'}
-                                </p>
-                                </div>
-                                <div>
-                                <p className="text-gray-600">Issuing Authority: <span className="text-red-500">*</span></p>
-                                <p className={`font-medium ${!formData.passportData.issuingAuthority ? 'text-red-500' : ''}`}>
-                                  {formData.passportData.issuingAuthority || 'Required'}
-                                </p>
-                                </div>
-                                <div>
-                                <p className="text-gray-600">Sex: <span className="text-red-500">*</span></p>
-                                <p className={`font-medium ${!formData.passportData.sex ? 'text-red-500' : ''}`}>
-                                  {formData.passportData.sex || 'Required'}
-                                </p>
-                                </div>
-                                <div>
-                                <p className="text-gray-600">Place of Birth: <span className="text-red-500">*</span></p>
-                                <p className={`font-medium ${!formData.passportData.placeOfBirth ? 'text-red-500' : ''}`}>
-                                  {formData.passportData.placeOfBirth || 'Required'}
-                                </p>
-                                </div>
-                                <div>
-                                <p className="text-gray-600">Issue Date: <span className="text-red-500">*</span></p>
-                                <p className={`font-medium ${!formData.passportData.issueDate ? 'text-red-500' : ''}`}>
-                                  {formData.passportData.issueDate || 'Required'}
-                                </p>
-                                </div>
-                            </div>
-                            
-                            {!isPassportDataComplete() && (
-                              <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-                                <p className="flex items-center">
-                                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                  </svg>
-                                  Some required fields are missing. Please click 'Edit' to complete all passport data.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Conditionally hide scanner/upload when editing */}
-                    {!isEditingPassportData && (
-                      <>
-                        {/* Passport scanner interface */}
-                        <div className="flex flex-col items-center">
-                          {/* Passport capture area */}
-                          {passportImage ? (
-                            <div className="relative w-full max-w-md h-64 mb-4 rounded-lg overflow-hidden border-2 border-gray-300">
-                              <img
-                                src={passportImage}
-                                alt="Passport scan"
-                                className="w-full h-full object-contain"
-                              />
-                              <button
-                                onClick={() => {
-                                  setPassportImage(null);
-                                  setFormData(prev => ({ ...prev, passportImage: null, passportData: null }));
-                                  setScanError(null);
-                                }}
-                                className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
-                                title="Remove scan"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                                </div>
-                          ) : (
-                            <div className="relative w-full max-w-md h-64 mb-4 rounded-lg overflow-hidden border-2 border-gray-300 flex items-center justify-center bg-gray-50" id="passport-scanner-container">
-                              {/* Video element for passport scanning */}
-                              <video
-                                ref={passportVideoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="absolute inset-0 w-full h-full object-cover z-10"
-                                style={{ display: passportStreamRef.current ? 'block' : 'none' }}
-                              />
-                              
-                              {/* Loading indicator for processing */}
-                              {isProcessing && (
-                                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
-                                  <div className="text-white text-center">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent mb-2"></div>
-                                    <p className="text-sm">Processing passport...</p>
-                                </div>
-                              </div>
-                              )}
-                              
-                              {/* Default state */}
-                              {!passportStreamRef.current && !isProcessing && (
-                                <div className="text-center p-4">
-                                  <FaPassport className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                                  <p className="text-gray-500">Position your passport information page in the frame</p>
-                                </div>
-                              )}
-                              
-                              {/* Guides for passport placement */}
-                              {passportStreamRef.current && (
-                                <div className="absolute inset-0 border-2 border-white border-opacity-20 z-20">
-                                  <div className="absolute inset-4 border border-white border-dashed"></div>
-                              </div>
-                            )}
-                          </div>
-                          )}
-                        </div>
-
-                        {/* Scanner controls */}
-                        <div className="mt-6 flex justify-center space-x-4">
-                        {passportStreamRef.current ? (
-                            <>
-                          <button 
-                            onClick={capturePassport}
-                            disabled={isProcessing}
-                            className="px-6 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-center min-w-[120px] disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                                {isProcessing ? 'Processing...' : 'Capture Passport'}
-                          </button>
-                              <button
-                                onClick={stopPassportScanner}
-                                className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-center min-w-[120px]"
-                              >
-                                Cancel
-                              </button>
-                            </>
-                        ) : (
-                          <>
-                            <button 
-                              onClick={startPassportScanner}
-                              disabled={isProcessing}
-                              className="px-6 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-center min-w-[120px] disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Scan with Camera
-                            </button>
-                            <label className={`px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-center min-w-[120px] cursor-pointer ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                Upload Passport
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handlePassportUpload}
-                                disabled={isProcessing}
-                                className="hidden"
-                              />
-                            </label>
-                          </>
-                        )}
-                      </div>
-                      </> // Close the fragment for conditional rendering
-                    )} 
-                    
-                    {/* Add continue button when passport data is available */}
-                    {formData.passportData && (
+                  {isUs && formData.us && usPassportSubStep === 1 && !processingTraveler ? (
+                    <>
+                      <h2 className="mb-2 text-center text-2xl font-bold text-gray-900">
+                        Contact & Social Media
+                      </h2>
+                      <p className="mb-4 text-center text-sm text-primary-600">
+                        Section {usPassportSubStep + 1} of {usPassportSubSteps}
+                      </p>
+                      <UsContactSocialPanel
+                        data={formData.us.contactSocial}
+                        errors={usErrors}
+                        onChange={(contactSocial) => updateUs((prev) => ({ ...prev, contactSocial }))}
+                      />
                       <div className="mt-6 flex justify-between">
-                        <button
-                          onClick={handleBack}
-                          className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                        >
-                          Back
-                        </button>
-                        <button
-                          onClick={handleNext}
-                          disabled={!isPassportDataComplete()}
-                          className="px-6 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {!isPassportDataComplete() ? 'Complete All Fields' : 'Continue'}
-                        </button>
+                        <button onClick={handleBack} className="rounded-lg bg-gray-100 px-6 py-2.5 text-gray-700 hover:bg-gray-200">Back</button>
+                        <button onClick={handleNext} className="rounded-lg bg-primary-600 px-6 py-2.5 text-white hover:bg-primary-700">Continue</button>
                       </div>
-                    )}
-                  </div>
+                    </>
+                  ) : (
+                    <PassportScannerPanel
+                      title={
+                        processingTraveler
+                          ? `Scan Passport for Traveler #${currentTravelerIndex !== null ? currentTravelerIndex + 2 : ''}`
+                          : isUs
+                            ? 'Passport & Bio-Data (DS-160)'
+                            : 'Scan Your Passport'
+                      }
+                      passportImage={passportImage}
+                      passportData={formData.passportData}
+                      isEditingPassportData={isEditingPassportData}
+                      onPassportImageChange={handlePassportImageChange}
+                      onPassportDataChange={handlePassportDataChange}
+                      onIsEditingChange={setIsEditingPassportData}
+                      onBack={handleBack}
+                      onContinue={handleNext}
+                    >
+                      {isUs && !processingTraveler && (
+                        <p className="mb-4 text-center text-sm text-primary-600">
+                          Section {usPassportSubStep + 1} of {usPassportSubSteps}
+                        </p>
+                      )}
+                      {isSchengen && formData.schengen && formData.passportData && (
+                        <SchengenPassportVerificationFields
+                          data={formData.schengen.passportVerification}
+                          currentNationality={formData.passportData.nationality}
+                          onChange={(passportVerification) =>
+                            updateSchengen((prev) => ({ ...prev, passportVerification }))
+                          }
+                        />
+                      )}
+                      {isUs && formData.us && formData.passportData && usPassportSubStep === 0 && (
+                        <UsPassportBioFields
+                          data={formData.us.passportBio}
+                          errors={usErrors}
+                          onChange={(passportBio) => updateUs((prev) => ({ ...prev, passportBio }))}
+                        />
+                      )}
+                    </PassportScannerPanel>
+                  )}
                 </motion.div>
               )}
 
-              {currentStep === 3 && (
+              {isSchengen && personalStep !== null && currentStep === personalStep && formData.schengen && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                >
+                  <SchengenPersonalProfessionalStep
+                    data={formData.schengen.personalProfessional}
+                    errors={schengenErrors}
+                    onChange={(personalProfessional) =>
+                      updateSchengen((prev) => ({ ...prev, personalProfessional }))
+                    }
+                    onBack={handleBack}
+                    onNext={handleNext}
+                  />
+                </motion.div>
+              )}
+
+              {currentStep === travelStep && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -2059,7 +1544,47 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                   className="space-y-6"
                 >
                   <h2 className="text-2xl font-bold text-gray-900">Travel Details</h2>
+                  {isUs && (
+                    <p className="text-sm text-primary-600">
+                      DS-160 Section {usTravelSubStep + 1} of {usTravelSubSteps}:{' '}
+                      {usTravelSubStep === 0 ? 'Travel & U.S. History' : usTravelSubStep === 1 ? 'Family Background' : 'Work & Education'}
+                    </p>
+                  )}
 
+                  {isUs && formData.us ? (
+                    <>
+                      {usTravelSubStep === 0 && (
+                        <UsTravelPanel
+                          data={formData.us.travelDetails}
+                          errors={usErrors}
+                          onChange={(travelDetails) => {
+                            updateUs((prev) => ({ ...prev, travelDetails }));
+                            if (travelDetails.arrivalDate) handleDateChange('arrival', travelDetails.arrivalDate);
+                            if (travelDetails.departureDate) handleDateChange('departure', travelDetails.departureDate);
+                            if (travelDetails.contactPersonName || travelDetails.organizationName) {
+                              handleAccommodationChange('name', travelDetails.organizationName || travelDetails.contactPersonName);
+                              handleAccommodationChange('address', travelDetails.contactUsAddress.street);
+                            }
+                          }}
+                        />
+                      )}
+                      {usTravelSubStep === 1 && (
+                        <UsFamilyPanel
+                          data={formData.us.familyBackground}
+                          errors={usErrors}
+                          onChange={(familyBackground) => updateUs((prev) => ({ ...prev, familyBackground }))}
+                        />
+                      )}
+                      {usTravelSubStep === 2 && (
+                        <UsWorkEducationPanel
+                          data={formData.us.workEducation}
+                          errors={usErrors}
+                          onChange={(workEducation) => updateUs((prev) => ({ ...prev, workEducation }))}
+                        />
+                      )}
+                    </>
+                  ) : (
+                  <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2091,6 +1616,23 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                   </div>
 
                   <div className="space-y-4">
+                    {isSchengen && formData.schengen ? (
+                      <SchengenTravelDetailsExtension
+                        data={formData.schengen.travelExtension}
+                        errors={schengenErrors}
+                        accommodationName={formData.accommodation.name}
+                        accommodationAddress={formData.accommodation.address}
+                        accommodationPhone={formData.accommodation.phone}
+                        waivedFields={waivedFormFields}
+                        onTravelChange={(travelExtension) =>
+                          updateSchengen((prev) => ({ ...prev, travelExtension }))
+                        }
+                        onAccommodationChange={(field, value) =>
+                          handleAccommodationChange(field, value)
+                        }
+                      />
+                    ) : (
+                      <>
                     <h3 className="text-lg font-semibold">Additional Information</h3>
                     
                     <div>
@@ -2141,6 +1683,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {!isFieldWaived(waivedFormFields, 'travel.accommodation.phone') && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Phone Number (Optional)
@@ -2153,7 +1696,9 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                             onChange={(e) => handleAccommodationChange('phone', e.target.value)}
                           />
                         </div>
+                        )}
                         
+                        {!isFieldWaived(waivedFormFields, 'travel.accommodation.email') && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Email (Optional)
@@ -2166,9 +1711,13 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                             onChange={(e) => handleAccommodationChange('email', e.target.value)}
                           />
                         </div>
+                        )}
                       </div>
                     </div>
+                      </>
+                    )}
                     
+                    {!isFieldWaived(waivedFormFields, 'travel.bookingConfirmation') && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Supporting Documents (Optional)</h3>
                       
@@ -2210,7 +1759,10 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                         </label>
                       </div>
                     </div>
+                    )}
                   </div>
+                  </>
+                  )}
 
                   {/* Navigation Buttons */}
                   <div className="flex justify-between mt-8">
@@ -2222,7 +1774,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                     </button>
                     <button
                       onClick={handleNext}
-                      disabled={!formData.travelDates.arrival || !formData.travelDates.departure || !formData.accommodation.name || !formData.accommodation.address}
+                      disabled={!isUs && (!formData.travelDates.arrival || !formData.travelDates.departure || !formData.accommodation.name || !formData.accommodation.address)}
                       className="px-6 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Next
@@ -2231,7 +1783,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                 </motion.div>
               )}
 
-              {currentStep === 4 && (
+              {currentStep === travelersStep && !processingTraveler && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -2298,6 +1850,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                   )}
                   
                   {/* Add traveler button */}
+                  {!isFieldWaived(waivedFormFields, 'travelers.additionalTravelersPrompt') && (
                   <button 
                     className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors"
                     onClick={addTraveler}
@@ -2307,6 +1860,31 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                       <span className="text-gray-600">Add Another Traveler</span>
                     </div>
                   </button>
+                  )}
+
+                  {isSchengen && formData.schengen && (
+                    <SchengenTravelersExemptions
+                      dateOfBirth={formData.passportData?.dateOfBirth}
+                      guardianDetails={formData.schengen.guardianDetails}
+                      euFamilyExemption={formData.schengen.euFamilyExemption}
+                      errors={schengenErrors}
+                      waivedFields={waivedFormFields}
+                      onGuardianChange={(guardianDetails) =>
+                        updateSchengen((prev) => ({ ...prev, guardianDetails }))
+                      }
+                      onEuFamilyChange={(euFamilyExemption) =>
+                        updateSchengen((prev) => ({ ...prev, euFamilyExemption }))
+                      }
+                    />
+                  )}
+
+                  {isUs && formData.us && (
+                    <UsTravelersCompanionsPanel
+                      data={formData.us.travelersCompanions}
+                      errors={usErrors}
+                      onChange={(travelersCompanions) => updateUs((prev) => ({ ...prev, travelersCompanions }))}
+                    />
+                  )}
 
                   {/* Navigation Buttons */}
                   <div className="flex justify-between mt-8">
@@ -2326,7 +1904,7 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                 </motion.div>
               )}
 
-              {currentStep === 5 && (
+              {currentStep === checkoutStep && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -2340,7 +1918,10 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                     <div className="space-y-4">
                       <div className="flex justify-between items-center border-b border-primary-100 pb-3">
                         <span className="text-gray-700 font-medium">Visa Type</span>
-                        <span className="text-lg font-semibold text-primary-700">Tourist eVisa</span>
+                        <span className="text-lg font-semibold text-primary-700">
+                          {resolvedRouting?.visaTypeLabel ??
+                            (isSchengen ? 'Schengen Visa' : isUs ? 'U.S. Visa (DS-160)' : 'Tourist eVisa')}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center border-b border-primary-100 pb-3">
                         <span className="text-gray-700 font-medium">Number of Travelers</span>
@@ -2348,29 +1929,122 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-700 font-medium">Processing Time</span>
-                        <span className="text-lg font-semibold text-primary-700">Standard (5-7 business days)</span>
+                        <span className="text-lg font-semibold text-primary-700">
+                          {isSchengen
+                            ? 'At least 15 working days'
+                            : addExpressProcessing && isEvisaApplication
+                              ? 'Express (1 business day)'
+                              : 'Standard (3-5 business days)'}
+                        </span>
                       </div>
                     </div>
                   </div>
 
+                  {isSchengen && formData.schengen && (
+                    <SchengenCheckoutLegal
+                      meansOfSupport={formData.schengen.meansOfSupport}
+                      declarations={formData.schengen.declarations}
+                      hostName={formData.accommodation.name}
+                      hostAddress={formData.accommodation.address}
+                      errors={schengenErrors}
+                      onMeansChange={(meansOfSupport) =>
+                        updateSchengen((prev) => ({ ...prev, meansOfSupport }))
+                      }
+                      onDeclarationsChange={(declarations) =>
+                        updateSchengen((prev) => ({ ...prev, declarations }))
+                      }
+                    />
+                  )}
+
+                  {isUs && formData.us && (
+                    <UsCheckoutPanel
+                      data={formData.us.checkoutCompliance}
+                      errors={usErrors}
+                      onChange={(checkoutCompliance) => updateUs((prev) => ({ ...prev, checkoutCompliance }))}
+                    />
+                  )}
+
+                  {isSchengen && ukResidentForInsurance && (
+                    <SchengenTravelInsuranceAddon
+                      checked={addTravelInsurance}
+                      onChange={setAddTravelInsurance}
+                      travelDays={travelDays}
+                      travelerCount={formData.travelers.length + 1}
+                    />
+                  )}
+
+                  {isEvisaApplication && (
+                    <EvisaExpressProcessingAddon
+                      checked={addExpressProcessing}
+                      onChange={setAddExpressProcessing}
+                    />
+                  )}
+
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
                     <h3 className="text-xl font-bold mb-4 text-gray-900">Payment Details</h3>
+                    <p className="mb-4 text-sm text-gray-500">
+                      {isSchengen
+                        ? 'Borderly fees only. Embassy and VFS fees are paid separately at your appointment centre.'
+                        : 'Government visa fee plus Borderly service fee.'}
+                    </p>
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center pb-3">
-                        <span className="text-gray-700 text-lg">Visa Fee ({formData.travelers.length + 1} travelers)</span>
-                        <span className="text-lg font-semibold">£{(visaFeePerTraveler * (formData.travelers.length + 1)).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between items-center pb-3">
-                        <div>
-                          <span className="text-gray-700 text-lg">Service Fee</span>
-                          {subscriptionTier !== 'free' && (
-                            <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
-                              {getServiceFeeDiscountPercent(subscriptionTier)}% off
+                      {isSchengen ? (
+                        <>
+                          <div className="flex justify-between items-center pb-3">
+                            <span className="text-gray-700 text-lg">
+                              Appointment booking ({formData.travelers.length + 1} travelers)
                             </span>
+                            <span className="text-lg font-semibold">
+                              £{getSchengenPricing().appointmentFee.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center pb-3">
+                            <div>
+                              <span className="text-gray-700 text-lg">Borderly visa service</span>
+                              {subscriptionTier !== 'free' && (
+                                <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
+                                  {getServiceFeeDiscountPercent(subscriptionTier)}% off
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-lg font-semibold">£{getSchengenPricing().serviceFee.toFixed(2)}</span>
+                          </div>
+                          {getSchengenPricing().travelInsurance > 0 && (
+                            <div className="flex justify-between items-center pb-3">
+                              <span className="text-gray-700 text-lg">Travel insurance add-on</span>
+                              <span className="text-lg font-semibold">
+                                £{getSchengenPricing().travelInsurance.toFixed(2)}
+                              </span>
+                            </div>
                           )}
-                        </div>
-                        <span className="text-lg font-semibold">£{getServiceFee().toFixed(2)}</span>
-                      </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex justify-between items-center pb-3">
+                            <span className="text-gray-700 text-lg">Visa Fee ({formData.travelers.length + 1} travelers)</span>
+                            <span className="text-lg font-semibold">£{(visaFeePerTraveler * (formData.travelers.length + 1)).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center pb-3">
+                            <div>
+                              <span className="text-gray-700 text-lg">Service Fee</span>
+                              {subscriptionTier !== 'free' && (
+                                <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
+                                  {getServiceFeeDiscountPercent(subscriptionTier)}% off
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-lg font-semibold">£{getServiceFee().toFixed(2)}</span>
+                          </div>
+                          {addExpressProcessing && isEvisaApplication && (
+                            <div className="flex justify-between items-center pb-3">
+                              <span className="text-gray-700 text-lg">Express processing add-on</span>
+                              <span className="text-lg font-semibold">
+                                £{EVISA_EXPRESS_PROCESSING_FEE_GBP.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
                       <div className="flex justify-between items-center border-t border-gray-200 pt-4">
                         <span className="text-xl font-bold text-gray-900">Total</span>
                         <span className="text-2xl font-bold text-primary-600">£{getTotalFee().toFixed(2)}</span>
@@ -2533,16 +2207,10 @@ const VisaApplicationStepper: React.FC<VisaApplicationStepperProps> = ({
         </div>
       )}
       
-      {/* Always render video elements but keep them hidden when not needed */}
+      {/* Always render video element for photo step fallback */}
       <div style={{ display: 'none' }}>
         <video 
           ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-        />
-        <video 
-          ref={passportVideoRef}
           autoPlay
           playsInline
           muted

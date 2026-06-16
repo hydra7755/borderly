@@ -4,12 +4,26 @@ import { useNavigate } from 'react-router-dom';
 import CountrySelect from './CountrySelect';
 import { ALL_COUNTRIES, getFlagUrl } from '../utils/countries';
 import { visaRequirementsService } from '../services/visaRequirementsService';
+import {
+  canApplyOnlineForDestination,
+  isSchengenVisaApplication,
+} from '../utils/schengenCountries';
+import { isUsVisaApplication } from '../utils/unitedStatesVisa';
+import { useVisaRouting } from '../hooks/useVisaRouting';
+import VisaEligibilityInput from './VisaEligibility/VisaEligibilityInput';
+import VisaRoutingSummary from './VisaEligibility/VisaRoutingSummary';
+import { buildEligibilitySearchParams } from '../engine/visaRoutingEngine';
+import {
+  getDestinationWaiverUiState,
+  getWaiverResultMessage,
+  getWaiverResultTitle,
+} from '../config/destinationWaiverUi';
 
 interface VisaCheckerProps {
   onApplyEVisa?: (nationality: string, destination: string) => void;
 }
 
-const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
+const VisaChecker: React.FC<VisaCheckerProps> = () => {
   const navigate = useNavigate();
   const [nationality, setNationality] = useState('');
   const [destination, setDestination] = useState('');
@@ -18,9 +32,29 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
     requirement: string;
     message: string;
     canApplyForEVisa: boolean;
+    canApplyOnline: boolean;
+    isSchengenApplication: boolean;
+    isUsApplication: boolean;
     isLoading?: boolean;
     stayDuration?: number;
   } | null>(null);
+
+  const {
+    eligibility,
+    routingResult,
+    setResidenceCountry,
+    togglePremiumVisa,
+  } = useVisaRouting({
+    passportNationality: nationality || 'xx',
+    destinationCode: destination || 'xx',
+    initialSearch: '',
+  });
+
+  const eligibilityQuery = () => {
+    const params = buildEligibilitySearchParams(eligibility);
+    const query = params.toString();
+    return query ? `?${query}` : '';
+  };
 
   const checkVisaRequirement = async () => {
     if (!nationality || !destination) return;
@@ -30,6 +64,9 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
       requirement: 'loading',
       message: 'Checking visa requirements...',
       canApplyForEVisa: false,
+      canApplyOnline: false,
+      isSchengenApplication: false,
+      isUsApplication: false,
       isLoading: true,
     });
 
@@ -47,12 +84,15 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
           requirement: 'unknown',
           message: `We could not determine the visa requirements for ${passportCountry} citizens traveling to ${destinationCountry}. Please check with the embassy or consulate for accurate information.`,
           canApplyForEVisa: false,
+      canApplyOnline: false,
+      isSchengenApplication: false,
+      isUsApplication: false,
           isLoading: false,
         });
         return;
       }
 
-      const message = visaRequirementsService.buildRequirementMessage(
+      let message = visaRequirementsService.buildRequirementMessage(
         visaReq.requirement,
         passportCountry,
         destinationCountry,
@@ -60,11 +100,24 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
         visaReq.notes
       );
 
+      const isSchengenApplication = isSchengenVisaApplication(visaReq.requirement, destination);
+      const isUsApplication = isUsVisaApplication(visaReq.requirement, destination);
+      if (isSchengenApplication) {
+        message = `Citizens of ${passportCountry} need a Schengen visa to travel to ${destinationCountry}. You can apply online through Borderly — we will guide you through the full Schengen application.`;
+      } else if (isUsApplication) {
+        message = `Citizens of ${passportCountry} need a U.S. visa to travel to the United States. You can complete the DS-160 application online through Borderly.`;
+      }
+
+      const canApplyOnline = canApplyOnlineForDestination(visaReq.requirement, destination);
+
       setResult({
         checked: true,
         requirement: visaReq.requirement,
         message,
         canApplyForEVisa: ['evisa', 'eta'].includes(visaReq.requirement),
+        canApplyOnline,
+        isSchengenApplication,
+        isUsApplication,
         stayDuration: visaReq.stay_duration ?? undefined,
         isLoading: false,
       });
@@ -75,23 +128,37 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
         requirement: 'error',
         message: 'An error occurred while checking visa requirements. Please try again later.',
         canApplyForEVisa: false,
+      canApplyOnline: false,
+      isSchengenApplication: false,
+      isUsApplication: false,
         isLoading: false,
       });
     }
   };
 
-  const handleApplyClick = () => {
-    if (onApplyEVisa) {
-      onApplyEVisa(nationality, destination);
-      return;
-    }
-    navigate(`/visa/apply/${nationality}/${destination}`);
+  const handleViewProductPage = () => {
+    const query = eligibilityQuery();
+    navigate(`/visa/${destination}?nationality=${nationality}${query ? query.replace('?', '&') : ''}`);
+  };
+
+  const handleContinueToApplication = () => {
+    handleViewProductPage();
   };
 
   const nationalityCountry = ALL_COUNTRIES.find((c) => c.code === nationality);
   const destinationCountry = ALL_COUNTRIES.find((c) => c.code === destination);
+  const waiverUi = getDestinationWaiverUiState(
+    destination,
+    result?.requirement,
+    routingResult
+  );
 
   const getResultTitle = () => {
+    const waiverTitle = getWaiverResultTitle(waiverUi);
+    if (waiverTitle) return waiverTitle;
+    if (waiverUi.anyWaiverRoute && result?.requirement === 'visa-required') {
+      return 'Traditional Visa Required';
+    }
     switch (result?.requirement) {
       case 'visa-free':
         return 'Visa-Free Travel Available';
@@ -102,7 +169,11 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
       case 'eta':
         return 'Electronic Travel Authorization Required';
       case 'visa-required':
-        return 'Traditional Visa Required';
+        return result?.isSchengenApplication
+          ? 'Schengen Visa Required'
+          : result?.isUsApplication
+            ? 'U.S. Visa Required'
+            : 'Traditional Visa Required';
       case 'error':
         return 'Error';
       default:
@@ -137,6 +208,17 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
           placeholder="Select where you want to travel"
         />
       </div>
+
+      {nationality && destination && (
+        <div className="mt-6">
+          <VisaEligibilityInput
+            residenceCountry={eligibility.residenceCountry}
+            heldPremiumVisas={eligibility.heldPremiumVisas}
+            onResidenceCountryChange={setResidenceCountry}
+            onPremiumVisaToggle={togglePremiumVisa}
+          />
+        </div>
+      )}
 
       <div className="mt-8 space-y-4">
         <motion.button
@@ -205,37 +287,88 @@ const VisaChecker: React.FC<VisaCheckerProps> = ({ onApplyEVisa }) => {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                   {getResultTitle()}
                 </h3>
-                <p className="text-gray-700 dark:text-gray-300">{result.message}</p>
+                <p className="text-gray-700 dark:text-gray-300">
+                  {getWaiverResultMessage(
+                    waiverUi,
+                    nationalityCountry?.name ?? 'your country',
+                    destinationCountry?.name ?? 'your destination'
+                  ) ?? result.message}
+                </p>
+                {nationality && destination && (
+                  <div className="mt-4 text-left">
+                    <VisaRoutingSummary routing={routingResult} />
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row justify-center gap-4 mt-2">
-                {result.canApplyForEVisa && (
+                {(result.canApplyForEVisa || waiverUi.anyEligible) && (
                   <motion.button
-                    onClick={handleApplyClick}
+                    onClick={handleContinueToApplication}
                     className="bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white py-3 px-6 rounded-md font-medium"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    Apply for eVisa
+                    {waiverUi.turkeyEligible
+                      ? 'Continue to Turkey eVisa'
+                      : waiverUi.moroccoEligible
+                        ? 'Continue to Morocco eVisa'
+                        : 'View eVisa Details & Apply'}
                   </motion.button>
                 )}
 
-                {result.requirement === 'visa-required' && (
+                {result.isSchengenApplication && (
+                  <motion.button
+                    onClick={handleContinueToApplication}
+                    className="bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white py-3 px-6 rounded-md font-medium"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    View Schengen Visa Details
+                  </motion.button>
+                )}
+
+                {result.isUsApplication && (
+                  <motion.button
+                    onClick={handleContinueToApplication}
+                    className="bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white py-3 px-6 rounded-md font-medium"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    View U.S. Visa Details
+                  </motion.button>
+                )}
+
+                {result.requirement === 'visa-required' &&
+                  !result.isSchengenApplication &&
+                  !result.isUsApplication &&
+                  !waiverUi.anyEligible && (
                   <p className="text-sm text-gray-600 dark:text-gray-400 text-center px-4 py-3 bg-white/60 dark:bg-gray-800/60 rounded-md">
-                    A traditional embassy visa is required. Contact the {destinationCountry?.name} embassy or consulate in your country to apply.
+                    {waiverUi.anyWaiverRoute
+                      ? `Update your eligibility context above, then view the ${destinationCountry?.name} visa page for supporting-document requirements and application options.`
+                      : `A traditional embassy visa is required. Contact the ${destinationCountry?.name} embassy or consulate in your country to apply.`}
                   </p>
                 )}
 
-                {['visa-free', 'visa-on-arrival', 'evisa', 'eta'].includes(result.requirement) && destination && (
+                {waiverUi.anyWaiverRoute && !waiverUi.anyEligible && (
                   <motion.button
-                    onClick={() => navigate(`/visa/${destination}?nationality=${nationality}`)}
+                    onClick={handleViewProductPage}
                     className="bg-white dark:bg-gray-700 border border-teal-600 text-teal-700 dark:text-teal-300 py-3 px-6 rounded-md font-medium hover:bg-teal-50 dark:hover:bg-gray-600"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    {result.requirement === 'evisa' || result.requirement === 'eta'
-                      ? 'View Application Details'
-                      : 'See More Details'}
+                    View {destinationCountry?.name} Visa Requirements
+                  </motion.button>
+                )}
+
+                {['visa-free', 'visa-on-arrival'].includes(result.requirement) && destination && (
+                  <motion.button
+                    onClick={handleViewProductPage}
+                    className="bg-white dark:bg-gray-700 border border-teal-600 text-teal-700 dark:text-teal-300 py-3 px-6 rounded-md font-medium hover:bg-teal-50 dark:hover:bg-gray-600"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    See More Details
                   </motion.button>
                 )}
               </div>

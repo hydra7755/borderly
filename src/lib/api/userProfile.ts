@@ -2,8 +2,173 @@ import { supabase } from '../supabase/client';
 import { PostgrestError, PostgrestSingleResponse } from '@supabase/supabase-js';
 import authService from './auth';
 import { User } from '../../types/user';
+import { stripeService } from './stripeService';
 
 const LOCAL_STORAGE_PROFILE_KEY = 'travelscore_user_profile';
+const PAID_SUBSCRIPTION_KEY = 'borderly_paid_subscription';
+
+type SubscriptionTier = UserProfile['subscription_tier'];
+
+export interface SubscriptionDetails {
+  billingCycle?: 'monthly' | 'annual' | 'lifetime' | null;
+  periodEnd?: number | null;
+  cancelAtPeriodEnd?: boolean;
+  isLifetime?: boolean;
+  customerId?: string | null;
+  subscriptionId?: string | null;
+}
+
+interface PaidSubscriptionRecord {
+  tier: SubscriptionTier;
+  verifiedAt?: string;
+  sessionId?: string;
+  billingCycle?: SubscriptionDetails['billingCycle'];
+  periodEnd?: number | null;
+  cancelAtPeriodEnd?: boolean;
+  isLifetime?: boolean;
+  customerId?: string | null;
+  subscriptionId?: string | null;
+}
+
+const SUBSCRIPTION_TIER_RANK: Record<string, number> = {
+  free: 0,
+  premium: 1,
+  monthly: 1,
+  lifetime: 1,
+  enterprise: 2,
+  business: 2,
+};
+
+export function normalizeSubscriptionTier(tier?: string | null): SubscriptionTier {
+  const value = (tier || 'free').toLowerCase();
+  if (value === 'enterprise' || value === 'business') return 'enterprise';
+  if (value === 'premium' || value === 'monthly' || value === 'lifetime') return 'premium';
+  return 'free';
+}
+
+function pickBestSubscriptionTier(...tiers: (string | undefined | null)[]): SubscriptionTier {
+  let best: SubscriptionTier = 'free';
+  for (const tier of tiers) {
+    const normalized = normalizeSubscriptionTier(tier);
+    if ((SUBSCRIPTION_TIER_RANK[normalized] ?? 0) > (SUBSCRIPTION_TIER_RANK[best] ?? 0)) {
+      best = normalized;
+    }
+  }
+  return best;
+}
+
+const getPaidSubscriptionRecord = (): PaidSubscriptionRecord | null => {
+  try {
+    const raw = localStorage.getItem(PAID_SUBSCRIPTION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PaidSubscriptionRecord & { tier?: string };
+    if (!parsed.tier) return null;
+    return {
+      ...parsed,
+      tier: normalizeSubscriptionTier(parsed.tier),
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const getStoredSubscriptionDetails = (): SubscriptionDetails | null => {
+  const record = getPaidSubscriptionRecord();
+  if (!record) return null;
+  return {
+    billingCycle: record.billingCycle ?? null,
+    periodEnd: record.periodEnd ?? null,
+    cancelAtPeriodEnd: record.cancelAtPeriodEnd ?? false,
+    isLifetime: record.isLifetime ?? false,
+    customerId: record.customerId ?? null,
+    subscriptionId: record.subscriptionId ?? null,
+  };
+};
+
+export const savePaidSubscriptionRecord = (
+  tier: string,
+  sessionId?: string,
+  details?: SubscriptionDetails
+) => {
+  const normalized = normalizeSubscriptionTier(tier);
+  const existing = getPaidSubscriptionRecord();
+  localStorage.setItem(
+    PAID_SUBSCRIPTION_KEY,
+    JSON.stringify({
+      ...existing,
+      tier: normalized,
+      sessionId: sessionId ?? existing?.sessionId,
+      verifiedAt: new Date().toISOString(),
+      billingCycle: details?.billingCycle ?? existing?.billingCycle,
+      periodEnd: details?.periodEnd ?? existing?.periodEnd,
+      cancelAtPeriodEnd: details?.cancelAtPeriodEnd ?? existing?.cancelAtPeriodEnd,
+      isLifetime: details?.isLifetime ?? existing?.isLifetime,
+      customerId: details?.customerId ?? existing?.customerId,
+      subscriptionId: details?.subscriptionId ?? existing?.subscriptionId,
+    } satisfies PaidSubscriptionRecord)
+  );
+};
+
+const emitSubscriptionUpdated = (tier: SubscriptionTier) => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('borderly:subscription-updated', { detail: { tier } })
+    );
+  }
+};
+
+async function persistSubscriptionTier(
+  userId: string,
+  tier: SubscriptionTier,
+  email?: string,
+  details?: SubscriptionDetails
+): Promise<SubscriptionTier> {
+  const normalized = normalizeSubscriptionTier(tier);
+  savePaidSubscriptionRecord(normalized, undefined, details);
+
+  const authMetadata: Record<string, string | boolean> = {
+    subscription_tier: normalized,
+  };
+  if (details?.billingCycle) authMetadata.subscription_billing_cycle = details.billingCycle;
+  if (details?.periodEnd) authMetadata.subscription_period_end = String(details.periodEnd);
+  if (details?.cancelAtPeriodEnd !== undefined) {
+    authMetadata.subscription_cancel_at_period_end = details.cancelAtPeriodEnd;
+  }
+  if (details?.isLifetime !== undefined) authMetadata.subscription_is_lifetime = details.isLifetime;
+  if (details?.customerId) authMetadata.stripe_customer_id = details.customerId;
+  if (details?.subscriptionId) authMetadata.stripe_subscription_id = details.subscriptionId;
+
+  try {
+    await supabase
+      .from('profiles')
+      .update({
+        subscription_tier: normalized,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+  } catch (error) {
+    console.warn('Could not persist subscription tier to profiles:', error);
+  }
+
+  try {
+    await supabase.auth.updateUser({ data: authMetadata });
+  } catch (error) {
+    console.warn('Could not persist subscription tier to auth metadata:', error);
+  }
+
+  const stored = getStoredProfile();
+  const nextProfile: UserProfile = {
+    ...(stored ?? createDefaultProfile()),
+    id: userId,
+    email: email || stored?.email || '',
+    subscription_tier: normalized,
+    updated_at: new Date().toISOString(),
+  };
+  saveStoredProfile(nextProfile);
+  syncStoredUser(nextProfile);
+  emitSubscriptionUpdated(normalized);
+  return normalized;
+}
 
 async function syncProfileWithAuthUser(profile: UserProfile, user: User): Promise<UserProfile> {
   const metaNationality = user.nationality || user.user_metadata?.nationality || '';
@@ -55,6 +220,12 @@ export interface UserProfile {
   travel_score?: number;
   questionnaire_completed?: boolean;
   subscription_tier?: 'free' | 'premium' | 'enterprise';
+  subscription_billing_cycle?: 'monthly' | 'annual' | 'lifetime' | null;
+  subscription_period_end?: number | null;
+  subscription_cancel_at_period_end?: boolean;
+  subscription_is_lifetime?: boolean;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
   created_at?: string;
   updated_at?: string;
   profile_image_url?: string;
@@ -139,16 +310,64 @@ const syncStoredUser = (profile: Partial<UserProfile>) => {
       full_name: profile.full_name ?? user.full_name,
       nationality: profile.nationality ?? user.nationality,
       residency: profile.residency ?? user.residency,
+      subscription_tier: profile.subscription_tier ?? user.subscription_tier,
       user_metadata: {
         ...(user.user_metadata || {}),
         full_name: profile.full_name ?? user.user_metadata?.full_name,
         nationality: profile.nationality ?? user.user_metadata?.nationality,
         residency: profile.residency ?? user.user_metadata?.residency,
+        subscription_tier: profile.subscription_tier ?? user.user_metadata?.subscription_tier,
       },
     }));
   } catch {
     // ignore storage errors
   }
+};
+
+const parseSubscriptionDetailsFromUser = (user: User): SubscriptionDetails => {
+  const meta = user.user_metadata || {};
+  const periodEndRaw = meta.subscription_period_end;
+  const periodEnd =
+    typeof periodEndRaw === 'number'
+      ? periodEndRaw
+      : typeof periodEndRaw === 'string' && periodEndRaw
+        ? Number(periodEndRaw)
+        : null;
+
+  return {
+    billingCycle: (meta.subscription_billing_cycle as SubscriptionDetails['billingCycle']) ?? null,
+    periodEnd: Number.isFinite(periodEnd) ? periodEnd : null,
+    cancelAtPeriodEnd: Boolean(meta.subscription_cancel_at_period_end),
+    isLifetime: Boolean(meta.subscription_is_lifetime),
+    customerId: (meta.stripe_customer_id as string) ?? null,
+    subscriptionId: (meta.stripe_subscription_id as string) ?? null,
+  };
+};
+
+const mergeSubscriptionDetails = (
+  user: User,
+  storedRecord: PaidSubscriptionRecord | null
+): SubscriptionDetails => {
+  const fromUser = parseSubscriptionDetailsFromUser(user);
+  const fromRecord = storedRecord
+    ? {
+        billingCycle: storedRecord.billingCycle ?? null,
+        periodEnd: storedRecord.periodEnd ?? null,
+        cancelAtPeriodEnd: storedRecord.cancelAtPeriodEnd ?? false,
+        isLifetime: storedRecord.isLifetime ?? false,
+        customerId: storedRecord.customerId ?? null,
+        subscriptionId: storedRecord.subscriptionId ?? null,
+      }
+    : null;
+
+  return {
+    billingCycle: fromRecord?.billingCycle ?? fromUser.billingCycle ?? null,
+    periodEnd: fromRecord?.periodEnd ?? fromUser.periodEnd ?? null,
+    cancelAtPeriodEnd: fromRecord?.cancelAtPeriodEnd ?? fromUser.cancelAtPeriodEnd ?? false,
+    isLifetime: fromRecord?.isLifetime ?? fromUser.isLifetime ?? false,
+    customerId: fromRecord?.customerId ?? fromUser.customerId ?? null,
+    subscriptionId: fromRecord?.subscriptionId ?? fromUser.subscriptionId ?? null,
+  };
 };
 
 const pickText = (...values: (string | undefined | null)[]): string => {
@@ -187,10 +406,13 @@ const mergeProfileData = (
     user.user_metadata?.residency
   ),
   travel_score: supabaseProfile?.travel_score ?? storedProfile?.travel_score ?? 0,
-  subscription_tier: (supabaseProfile?.subscription_tier ??
-    storedProfile?.subscription_tier ??
-    user.subscription_tier ??
-    'free') as UserProfile['subscription_tier'],
+  subscription_tier: pickBestSubscriptionTier(
+    supabaseProfile?.subscription_tier,
+    storedProfile?.subscription_tier,
+    user.subscription_tier,
+    user.user_metadata?.subscription_tier,
+    getPaidSubscriptionRecord()?.tier
+  ),
   questionnaire_completed:
     supabaseProfile?.questionnaire_completed ??
     storedProfile?.questionnaire_completed ??
@@ -203,6 +425,17 @@ const mergeProfileData = (
   saved_documents: storedProfile?.saved_documents ?? [],
   created_at: supabaseProfile?.created_at ?? storedProfile?.created_at ?? user.created_at,
   updated_at: supabaseProfile?.updated_at ?? storedProfile?.updated_at ?? new Date().toISOString(),
+  ...(() => {
+    const details = mergeSubscriptionDetails(user, getPaidSubscriptionRecord());
+    return {
+      subscription_billing_cycle: details.billingCycle,
+      subscription_period_end: details.periodEnd,
+      subscription_cancel_at_period_end: details.cancelAtPeriodEnd,
+      subscription_is_lifetime: details.isLifetime,
+      stripe_customer_id: details.customerId,
+      stripe_subscription_id: details.subscriptionId,
+    };
+  })(),
 });
 
 /**
@@ -262,6 +495,26 @@ export const userProfileService = {
       const mergedProfile = mergeProfileData(user, supabaseProfile, storedProfile);
       const syncedProfile = await syncProfileWithAuthUser(mergedProfile, user);
 
+      // Self-heal: persist paid tier to Supabase when DB still shows free
+      if (
+        user.id &&
+        supabaseProfile &&
+        normalizeSubscriptionTier(syncedProfile.subscription_tier) !== 'free' &&
+        normalizeSubscriptionTier(supabaseProfile.subscription_tier) === 'free'
+      ) {
+        try {
+          await supabase
+            .from('profiles')
+            .update({
+              subscription_tier: syncedProfile.subscription_tier,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+        } catch (tierSyncError) {
+          console.warn('Could not sync subscription tier to Supabase:', tierSyncError);
+        }
+      }
+
       let travelHistory: string[] = syncedProfile.travel_history ?? [];
       let savedCountries: string[] = syncedProfile.saved_countries ?? [];
       let savedDocuments = syncedProfile.saved_documents ?? [];
@@ -303,6 +556,25 @@ export const userProfileService = {
         saved_countries: savedCountries,
         saved_documents: savedDocuments,
       };
+
+      if (user.email) {
+        const syncedTier = await userProfileService.syncSubscriptionFromStripe(
+          user.email,
+          user.id
+        );
+        if (syncedTier) {
+          fullProfile.subscription_tier = syncedTier;
+          const details = mergeSubscriptionDetails(user, getPaidSubscriptionRecord());
+          Object.assign(fullProfile, {
+            subscription_billing_cycle: details.billingCycle,
+            subscription_period_end: details.periodEnd,
+            subscription_cancel_at_period_end: details.cancelAtPeriodEnd,
+            subscription_is_lifetime: details.isLifetime,
+            stripe_customer_id: details.customerId,
+            stripe_subscription_id: details.subscriptionId,
+          });
+        }
+      }
 
       saveStoredProfile(fullProfile);
       syncStoredUser(fullProfile);
@@ -362,6 +634,13 @@ export const userProfileService = {
             phone_number: updatedProfile.phone_number || null,
             passport_number: updatedProfile.passport_number || null,
             passport_expiry: updatedProfile.passport_expiry || null,
+            subscription_tier: pickBestSubscriptionTier(
+              profileData.subscription_tier,
+              updatedProfile.subscription_tier,
+              getPaidSubscriptionRecord()?.tier
+            ),
+            travel_score: updatedProfile.travel_score ?? null,
+            questionnaire_completed: updatedProfile.questionnaire_completed ?? null,
             updated_at: updatedProfile.updated_at,
           }, { onConflict: 'id' })
           .select()
@@ -371,6 +650,9 @@ export const userProfileService = {
           updatedProfile.nationality = data.nationality ?? updatedProfile.nationality ?? '';
           updatedProfile.residency = data.residency ?? updatedProfile.residency ?? '';
           updatedProfile.full_name = data.full_name ?? updatedProfile.full_name;
+          updatedProfile.subscription_tier = normalizeSubscriptionTier(
+            data.subscription_tier ?? updatedProfile.subscription_tier
+          );
         } else if (error) {
           console.warn('Supabase profile upsert failed, saving locally:', error);
         }
@@ -383,6 +665,9 @@ export const userProfileService = {
         if (profileData.full_name) authMetadata.full_name = profileData.full_name;
         if (profileData.nationality !== undefined) authMetadata.nationality = profileData.nationality || '';
         if (profileData.residency !== undefined) authMetadata.residency = profileData.residency || '';
+        if (profileData.subscription_tier) {
+          authMetadata.subscription_tier = normalizeSubscriptionTier(profileData.subscription_tier);
+        }
 
         if (Object.keys(authMetadata).length > 0) {
           try {
@@ -395,6 +680,10 @@ export const userProfileService = {
 
       saveStoredProfile(updatedProfile);
       syncStoredUser(updatedProfile);
+
+      if (profileData.subscription_tier) {
+        savePaidSubscriptionRecord(profileData.subscription_tier);
+      }
 
       return { profile: updatedProfile, error: null };
     } catch (error) {
@@ -589,7 +878,136 @@ export const userProfileService = {
       console.error('Error adding to travel history:', error);
       return { success: false, error: error as Error };
     }
-  }
+  },
+
+  /**
+   * Verify active Stripe subscription for an email and persist the tier locally + in Supabase.
+   */
+  async syncSubscriptionFromStripe(
+    email: string,
+    userId: string
+  ): Promise<SubscriptionTier | null> {
+    if (!email?.trim() || !userId) return null;
+
+    try {
+      const result = await stripeService.syncSubscriptionByEmail(email.trim());
+      if (!result.active || !result.tier) return null;
+
+      const tier = normalizeSubscriptionTier(result.tier);
+      if (tier === 'free') return null;
+
+      const details: SubscriptionDetails = {
+        billingCycle: (result.billingCycle as SubscriptionDetails['billingCycle']) ?? null,
+        periodEnd: result.periodEnd ?? null,
+        cancelAtPeriodEnd: result.cancelAtPeriodEnd ?? false,
+        isLifetime: result.isLifetime ?? false,
+        customerId: result.customerId ?? null,
+        subscriptionId: result.subscriptionId ?? null,
+      };
+
+      return await persistSubscriptionTier(userId, tier, email.trim(), details);
+    } catch (error) {
+      console.warn('Stripe subscription sync failed:', error);
+      return null;
+    }
+  },
+
+  async refreshSubscriptionDetails(
+    email: string,
+    userId: string
+  ): Promise<SubscriptionDetails | null> {
+    await this.syncSubscriptionFromStripe(email, userId);
+    const { user } = await authService.getCurrentUser();
+    if (user) {
+      return mergeSubscriptionDetails(user, getPaidSubscriptionRecord());
+    }
+    return getStoredSubscriptionDetails();
+  },
+
+  async cancelSubscription(): Promise<{ success: boolean; message: string }> {
+    const { user, error: authError } = await authService.getCurrentUser();
+    if (authError || !user?.email) {
+      throw new Error('You must be logged in to cancel your subscription');
+    }
+
+    const result = await stripeService.cancelSubscription(user.email);
+    const details: SubscriptionDetails = {
+      ...mergeSubscriptionDetails(user, getPaidSubscriptionRecord()),
+      cancelAtPeriodEnd: true,
+      periodEnd: result.periodEnd ?? null,
+    };
+    savePaidSubscriptionRecord(
+      normalizeSubscriptionTier(user.user_metadata?.subscription_tier || 'premium'),
+      undefined,
+      details
+    );
+
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          subscription_cancel_at_period_end: true,
+          ...(result.periodEnd ? { subscription_period_end: String(result.periodEnd) } : {}),
+        },
+      });
+    } catch (error) {
+      console.warn('Could not update cancel status in auth metadata:', error);
+    }
+
+    return { success: true, message: result.message };
+  },
+
+  async openBillingPortal(returnUrl?: string): Promise<string> {
+    const { user, error: authError } = await authService.getCurrentUser();
+    if (authError || !user?.email) {
+      throw new Error('You must be logged in to manage billing');
+    }
+    const result = await stripeService.createBillingPortalSession(
+      user.email,
+      returnUrl || `${window.location.origin}/dashboard`
+    );
+    return result.url;
+  },
+
+  /**
+   * Re-activate premium/enterprise after a successful Stripe checkout (e.g. if tier was not saved).
+   */
+  async restoreSubscriptionFromSession(
+    sessionId: string
+  ): Promise<{ success: boolean; tier?: SubscriptionTier; error: Error | null }> {
+    try {
+      const trimmed = sessionId.trim();
+      if (!trimmed) {
+        return { success: false, error: new Error('Please enter your Stripe checkout session ID') };
+      }
+
+      const { user, error: authError } = await authService.getCurrentUser();
+      if (authError || !user?.email) {
+        return { success: false, error: new Error('You must be logged in to restore a subscription') };
+      }
+
+      const result = await stripeService.verifyCheckoutSession(trimmed);
+      if (!result.paid) {
+        return { success: false, error: new Error('Payment not confirmed for this session') };
+      }
+
+      const tier = normalizeSubscriptionTier(result.subscriptionType || 'premium');
+      if (
+        result.customerEmail &&
+        result.customerEmail.toLowerCase() !== user.email.toLowerCase()
+      ) {
+        return {
+          success: false,
+          error: new Error('This payment was made with a different email address'),
+        };
+      }
+
+      savePaidSubscriptionRecord(tier, trimmed);
+      const appliedTier = await persistSubscriptionTier(user.id, tier, user.email);
+      return { success: true, tier: appliedTier, error: null };
+    } catch (error) {
+      return { success: false, error: error as Error };
+    }
+  },
 };
 
 export default userProfileService; 
